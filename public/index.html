@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -26,7 +25,7 @@
     <!-- Verdict shapes: each one is a different shape, not just a different colour -->
     <symbol id="i-safe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="currentColor"/><path d="M7 12.5l3.2 3.2L17 9" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-caution" viewBox="0 0 24 24"><path d="M12 2.5L22.5 21h-21z" fill="currentColor"/><path d="M12 9v5" stroke="#1a1a1a" stroke-width="2.6" stroke-linecap="round"/><circle cx="12" cy="17.5" r="1.5" fill="#1a1a1a"/></symbol>
-    <symbol id="i-danger" viewBox="0 0 24 24"><path d="M8 2h8l6 6v8l-6 6H8l-6-6V8z" fill="currentColor"/><path d="M8.5 8.5l7 7M15.5 8.5l-7 7" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/></symbol>
+    <symbol id="i-danger" viewBox="0 0 24 24"><path d="M8 2h8l6 6v8l-6 6H8l-6-6V8z" fill="currentColor"/><path d="M8.5 8.5l7 7M15.5 8.5l-7 7" style="stroke: var(--icon-inner, #fff)" stroke-width="2.6" stroke-linecap="round"/></symbol>
   </svg>
  
   <a class="skip-link" href="#checker">Skip to the checker</a>
@@ -39,6 +38,7 @@
     </a>
     <nav class="site-nav" aria-label="Main">
       <a href="#how">How it works</a>
+      <a href="#compare">Compare</a>
       <a href="#key">Reading a result</a>
       <a href="#checker" class="nav-cta">Start a check</a>
     </nav>
@@ -201,6 +201,26 @@
       </form>
     </section>
  
+    <!-- ===== Compare providers ===== -->
+    <section class="compare" id="compare" aria-labelledby="compare-title">
+      <h2 id="compare-title">Compare before you send</h2>
+      <p class="compare-intro">See how much the person you're paying would actually receive with different providers.</p>
+      <div class="compare-panel">
+        <form class="compare-form" id="compareForm">
+          <label class="field">
+            <span>You send (<span id="compareFromCode">GBP</span>)</span>
+            <input type="number" id="compareAmount" value="1000" min="1" step="any" inputmode="decimal">
+          </label>
+          <label class="field">
+            <span>They receive in</span>
+            <select id="compareTo"></select>
+          </label>
+        </form>
+        <p class="compare-note" id="compareNote">Example fees, using today's real mid-market rate. Change the amount or currency to try it.</p>
+        <div id="compareResults" aria-live="polite"></div>
+      </div>
+    </section>
+ 
     <!-- ===== Verdict key (for visual learners and colour-blind users) ===== -->
     <section class="key" id="key" aria-labelledby="key-title">
       <h2 id="key-title">Reading a result</h2>
@@ -247,7 +267,7 @@
     <label class="toggle"><input type="checkbox" data-setting="easyFont"> <span>Easy-read font</span></label>
     <label class="toggle"><input type="checkbox" data-setting="spacing"> <span>More space between lines and letters</span></label>
     <label class="toggle"><input type="checkbox" data-setting="contrast"> <span>High contrast</span></label>
-    <label class="toggle"><input type="checkbox" data-setting="cbPalette"> <span>Colour-blind palette (blue and orange)</span></label>
+    <label class="toggle"><input type="checkbox" data-setting="cbPalette"> <span>Colour-blind theme (blue and orange)</span></label>
     <label class="toggle"><input type="checkbox" data-setting="reduceMotion"> <span>Reduce motion</span></label>
     <label class="toggle"><input type="checkbox" data-setting="readAloud"> <span>Read results aloud</span></label>
  
@@ -257,4 +277,4 @@
   <script src="app.js"></script>
 </body>
 </html>
- 
+
