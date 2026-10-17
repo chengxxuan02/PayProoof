@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PayCheck</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+
+    <!-- ===== Top bar: logo + home currency ===== -->
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo">✓</div>
+        <div>
+          <h1>PayCheck</h1>
+          <p>Check it before you pay it</p>
+        </div>
+      </div>
+      <label class="home-currency">
+        <span>My currency</span>
+        <select id="homeCurrency">
+          <option value="GBP">🇬🇧 GBP</option>
+          <option value="EUR">🇪🇺 EUR</option>
+          <option value="USD">🇺🇸 USD</option>
+          <option value="INR">🇮🇳 INR</option>
+          <option value="CNY">🇨🇳 CNY</option>
+          <option value="JPY">🇯🇵 JPY</option>
+          <option value="AUD">🇦🇺 AUD</option>
+          <option value="CAD">🇨🇦 CAD</option>
+          <option value="PLN">🇵🇱 PLN</option>
+          <option value="TRY">🇹🇷 TRY</option>
+        </select>
+      </label>
+    </header>
+
+    <!-- ===== Mode buttons ===== -->
+    <nav class="modes">
+      <button type="button" class="mode active" data-mode="auto">✨ Auto</button>
+      <button type="button" class="mode" data-mode="convert">💱 Convert</button>
+      <button type="button" class="mode" data-mode="rate">📉 Rate check</button>
+      <button type="button" class="mode" data-mode="scam">🛡️ Scam check</button>
+    </nav>
+
+    <!-- ===== Chat area ===== -->
+    <main id="chat" class="chat">
+      <section id="welcome" class="welcome">
+        <h2>Check it before you pay it.</h2>
+        <p>Convert money at the real rate, spot rip-off exchange rates and catch scams. Just type, paste a message or add a photo.</p>
+        <div class="examples">
+          <button type="button" class="example" data-text="How much is €250 in pounds?">
+            <span>💱</span> How much is €250 in pounds?
+          </button>
+          <button type="button" class="example" data-text="The airport offered me 1.02 euros per pound to change £300">
+            <span>📉</span> The airport offered me 1.02 euros per pound to change £300
+          </button>
+          <button type="button" class="example" data-text="URGENT: our bank details have changed. Pay the £800 deposit today to secure the flat before the viewing.">
+            <span>🛡️</span> "URGENT: our bank details have changed. Pay the £800 deposit today…"
+          </button>
+        </div>
+      </section>
+    </main>
+
+    <!-- ===== Photo preview (shown when a photo is attached) ===== -->
+    <div id="imagePreview" class="image-preview hidden">
+      <img id="previewImg" alt="Attached photo">
+      <button type="button" id="removeImage" aria-label="Remove photo">✕</button>
+    </div>
+
+    <!-- ===== Message box ===== -->
+    <form id="composer" class="composer">
+      <label class="upload-btn" title="Add a photo">
+        📷
+        <input type="file" id="imageInput" accept="image/*" hidden>
+      </label>
+      <input type="text" id="messageInput" placeholder="Ask anything, paste a message, or add a photo…" autocomplete="off">
+      <button type="submit" class="send-btn">Check</button>
+    </form>
+
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
