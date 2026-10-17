@@ -1,0 +1,15 @@
+{
+  "name": "paycheck",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Check a payment before you make it: real rates, hidden fees and scam warning signs.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "latest",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0"
+  }
+}

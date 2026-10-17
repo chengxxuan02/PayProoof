@@ -1,24 +1,24 @@
-
 /* =====================================================================
    PayCheck styles
    Change the colours in :root to restyle the whole site.
    ===================================================================== */
  
 :root {
-  /* Greens */
-  --paper:   #eef3ea;   /* page background */
-  --surface: #fbfdf9;   /* panels and receipts */
-  --wash:    #dce9df;   /* soft fills */
-  --line:    #9cc3ac;   /* security-print lines */
-  --mid:     #2f6b4f;   /* buttons, accents */
-  --deep:    #0e3b2e;   /* banknote green, headings */
-  --ink:     #102419;   /* body text */
-  --muted:   #4a5e52;   /* secondary text */
+  /* Purple and lime theme */
+  --paper:   #f8fafc;   /* page background (light) */
+  --surface: #ffffff;   /* panels and receipts */
+  --wash:    #ede7fb;   /* soft purple fills */
+  --line:    #c084fc;   /* soft purple: security-print lines, borders */
+  --mid:     #6d3fc0;   /* readable purple: links, icons */
+  --deep:    #1e1b4b;   /* dark indigo: headings, buttons, banknote */
+  --ink:     #1b1838;   /* body text */
+  --muted:   #57537a;   /* secondary text */
+  --accent:  #a3e635;   /* lime green highlights */
  
   /* Verdicts: always paired with a shape, word and pattern */
-  --safe:    #2e7d4f;
-  --caution: #e0b23a;
-  --danger:  #8e1f1f;
+  --safe:    #3f7d12;
+  --caution: #e0a82e;
+  --danger:  #b3125a;
  
   --scale: 1;
   --font-body: "Atkinson Hyperlegible", system-ui, sans-serif;
@@ -30,10 +30,15 @@
 /* ---------- Accessibility settings (switched on by app.js) ---------- */
 html[data-easy-font] { --font-body: "Lexend", system-ui, sans-serif; --font-display: "Lexend", system-ui, sans-serif; }
 html[data-spacing]   { --leading: 1.95; --tracking: 0.03em; }
-html[data-cb-palette] { --safe: #1f6fb4; --caution: #f0a030; --danger: #222222; }
+/* Colour-blind theme: blue surf and sunkissed orange */
+html[data-cb-palette] {
+  --paper: #f6f8fb; --surface: #ffffff; --wash: #e3eaf4; --line: #8fa9cf;
+  --mid: #3b5b8a; --deep: #1f3354; --ink: #16233a; --muted: #4b5a70; --accent: #f28b30;
+  --safe: #3b5b8a; --caution: #f28b30; --danger: #1a1a1a;
+}
 html[data-contrast] {
-  --paper: #ffffff; --surface: #ffffff; --wash: #e8f2ea; --line: #003318;
-  --mid: #00502a; --deep: #002614; --ink: #000000; --muted: #1b1b1b;
+  --paper: #ffffff; --surface: #ffffff; --wash: #ece8f6; --line: #000000;
+  --mid: #3b1f8a; --deep: #120f33; --ink: #000000; --muted: #1b1b1b;
 }
 html[data-contrast] .card,
 html[data-contrast] .panel,
@@ -183,7 +188,7 @@ html[data-contrast] :focus-visible { outline: 4px solid #000; box-shadow: 0 0 0 
   border: 2px solid #fff; border-radius: 999px;
   font-weight: 700; transform: rotate(-6deg);
 }
-.note-stamp svg { width: 22px; height: 22px; color: var(--line); }
+.note-stamp svg { width: 22px; height: 22px; color: var(--accent); }
  
 /* Hidden micro-text, only visible inside the lens */
 .note-micro {
@@ -243,7 +248,7 @@ html[data-contrast] :focus-visible { outline: 4px solid #000; box-shadow: 0 0 0 
   width: 44px; height: 44px; margin: -22px 0 0 -22px;
   display: grid; place-items: center;
   border-radius: 50%;
-  background: var(--caution); color: var(--deep);
+  background: var(--accent); color: var(--deep);
   border: 3px solid var(--deep);
   font-family: var(--font-display); font-weight: 800; font-size: 1.2rem;
   box-shadow: 0 0 0 6px var(--paper);
@@ -289,7 +294,7 @@ html[data-contrast] :focus-visible { outline: 4px solid #000; box-shadow: 0 0 0 
 .mode svg { width: 20px; height: 20px; color: var(--mid); }
 .mode:hover { border-color: var(--line); }
 .mode.active { background: var(--deep); border-color: var(--deep); color: #fff; }
-.mode.active svg { color: var(--line); }
+.mode.active svg { color: var(--accent); }
  
 .chat {
   min-height: 300px; max-height: 60vh; overflow-y: auto;
@@ -363,14 +368,14 @@ html[data-contrast] :focus-visible { outline: 4px solid #000; box-shadow: 0 0 0 
 }
 .verdict svg { width: 26px; height: 26px; }
 .verdict.safe { color: var(--safe); background: color-mix(in srgb, var(--safe) 10%, var(--surface)); }
-.verdict.caution { color: #6b4f00; border-style: dashed; background: color-mix(in srgb, var(--caution) 22%, var(--surface)); }
+.verdict.caution { color: #5c3d00; border-style: dashed; background: color-mix(in srgb, var(--caution) 22%, var(--surface)); }
 .verdict.caution svg { color: var(--caution); }
 .verdict.danger {
   color: #fff; border-color: var(--danger);
   background: repeating-linear-gradient(-45deg, var(--danger) 0 8px, color-mix(in srgb, var(--danger) 78%, #000) 8px 16px);
 }
 .verdict.danger svg { color: #fff; }
-.verdict.danger svg path:last-child { stroke: var(--danger); }
+.verdict.danger svg { --icon-inner: var(--danger); }
  
 /* Visual bar comparing the offered rate with the real rate */
 .rate-bars { margin-top: 1rem; display: grid; gap: 0.5rem; }
@@ -454,7 +459,7 @@ html[data-contrast] :focus-visible { outline: 4px solid #000; box-shadow: 0 0 0 
   border: 2px solid var(--deep); border-radius: 20px;
   background: var(--surface); color: var(--ink);
 }
-.access-panel::backdrop { background: rgba(14, 59, 46, 0.45); }
+.access-panel::backdrop { background: rgba(30, 27, 75, 0.5); }
 .panel-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
 .panel-head h2 { margin: 0; font-size: 1.5rem; }
 .setting { border: 0; padding: 0; margin-bottom: 1rem; }
@@ -509,7 +514,25 @@ html[data-contrast] :focus-visible { outline: 4px solid #000; box-shadow: 0 0 0 
   .send-btn { padding: 0 1rem; }
   .mode { padding: 0 0.8rem; font-size: 0.95rem; }
 }
- /* ---------- Compare providers ---------- */
+ 
+/* ---------- Stage 5: conversion card ---------- */
+.convert-visual { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.9rem; }
+.coin-chip {
+  display: grid; place-items: center;
+  width: 54px; height: 54px; border-radius: 50%;
+  border: 3px solid var(--deep); background: var(--wash);
+  color: var(--deep); font-weight: 700; font-size: 0.9rem;
+}
+.coin-chip.to { background: var(--deep); color: #fff; }
+.convert-visual svg { width: 40px; height: 20px; color: var(--mid); }
+.card-link {
+  display: inline-flex; align-items: center; min-height: 44px; margin-top: 0.8rem; margin-right: 0.5rem;
+  padding: 0 1rem; border-radius: 999px;
+  background: var(--deep); color: #fff; font-weight: 700; text-decoration: none;
+}
+.card-link:hover { background: var(--mid); }
+ 
+/* ---------- Compare providers ---------- */
 .compare { max-width: 920px; margin: 0 auto; padding: 0 clamp(1rem, 4vw, 2.5rem) clamp(3rem, 8vw, 5rem); }
 .compare-intro { color: var(--muted); margin-bottom: 1.4rem; }
 .compare-panel {
@@ -526,7 +549,7 @@ html[data-contrast] :focus-visible { outline: 4px solid #000; box-shadow: 0 0 0 
 }
 .field input:focus, .field select:focus { outline: 3px solid var(--mid); outline-offset: 2px; border-color: var(--mid); }
 .compare-note { font-size: 0.9rem; color: var(--muted); margin-bottom: 1rem; }
-
+ 
 .providers { list-style: none; padding: 0; display: grid; gap: 0.6rem; }
 .provider {
   display: grid; grid-template-columns: 1.4fr 1fr 1.2fr; gap: 0.3rem 1rem; align-items: center;
@@ -543,16 +566,18 @@ html[data-contrast] :focus-visible { outline: 4px solid #000; box-shadow: 0 0 0 
 .provider-bar { grid-column: 1 / -1; height: 10px; border-radius: 5px; background: var(--wash); overflow: hidden; }
 .provider-bar span { display: block; height: 100%; border-radius: 5px; background: var(--line); }
 .provider.best .provider-bar span { background: var(--safe); }
-
+ 
 .compare-summary {
   display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.4rem 1rem;
   margin-top: 1.1rem; padding-top: 1rem; border-top: 2px dashed var(--wash);
 }
 .compare-summary strong { font-family: var(--font-display); font-size: clamp(1.5rem, 1.2rem + 1.5vw, 2rem); color: var(--deep); }
 .compare-summary span { color: var(--muted); }
-
+ 
 @media (max-width: 640px) {
   .compare-form { grid-template-columns: 1fr; }
   .provider { grid-template-columns: 1fr auto; }
   .provider-rate { grid-column: 1 / -1; grid-row: 2; }
 }
+ 
+
