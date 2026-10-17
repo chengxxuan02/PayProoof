@@ -172,29 +172,42 @@ function localAnalyse(text, home, mode) {
   const rateOffer = parseRateOffer(text);
   const amounts = findAmounts(text);
 
-  // Scam check
-  if (mode === 'scam' || (mode === 'auto' && scamReasons.length && !rateOffer)) {
-    const verdict = scamReasons.length === 0 ? 'safe' : scamReasons.length === 1 ? 'caution' : 'danger';
-    return { type: 'scam_check', verdict, reasons: scamReasons };
-  }
+  const scam = {
+    type: 'scam_check',
+    verdict: scamReasons.length === 0 ? 'safe' : scamReasons.length === 1 ? 'caution' : 'danger',
+    reasons: scamReasons,
+  };
+  // A scam warning is never hidden: if warning signs are found, that check is shown too
+  const withScamCheck = (main) => (scamReasons.length ? { type: 'both', results: [scam, main] } : main);
 
-  // Rate check
-  if (mode === 'rate' || (mode === 'auto' && rateOffer)) {
-    if (!rateOffer) {
-      return { type: 'message', text: 'Tell me the rate you were offered and the amount, for example: "1.05 euros per pound for £300".' };
-    }
-    return rateOffer;
-  }
-
-  // Convert
-  if (amounts.length) {
+  const makeConvert = () => {
+    if (!amounts.length) return null;
     const first = amounts[0];
     let to = findTarget(text) || home;
     if (to === first.currency) to = first.currency === home ? (home === 'EUR' ? 'GBP' : 'EUR') : home;
     return { type: 'convert', amount: first.value, from: first.currency, to };
+  };
+
+  const askRate = { type: 'message', text: 'Tell me the rate you were offered and the amount, for example: "1.05 euros per pound for £300".' };
+  const askAnything = { type: 'message', text: 'Include an amount and a currency, for example "How much is €250?", or paste a message to check it for scams.' };
+
+  if (mode === 'scam') return scam;
+
+  if (mode === 'rate') {
+    if (rateOffer) return withScamCheck(rateOffer);
+    return scamReasons.length ? scam : askRate;
   }
 
-  return { type: 'message', text: 'Include an amount and a currency, for example "How much is €250?", or paste a message to check it for scams.' };
+  if (mode === 'convert') {
+    const convert = makeConvert();
+    if (convert) return withScamCheck(convert);
+    return scamReasons.length ? scam : askAnything;
+  }
+
+  // "Work it out for me"
+  if (rateOffer) return withScamCheck(rateOffer);
+  if (scamReasons.length) return scam;
+  return makeConvert() || askAnything;
 }
 
 // ---------- Understanding currencies in normal writing ----------
@@ -230,19 +243,37 @@ function toCode(token) {
   return null;
 }
 
-const toNum = (s) => parseFloat(String(s).replace(/,/g, ''));
+// Reads numbers written in different styles: 1,234.56 / 1.234,56 / 12,50 / 1.02
+function toNum(s) {
+  let t = String(s);
+  const lastDot = t.lastIndexOf('.');
+  const lastComma = t.lastIndexOf(',');
+  if (lastDot > -1 && lastComma > -1) {
+    // Both appear: whichever comes last is the decimal point
+    const decimal = lastDot > lastComma ? '.' : ',';
+    const thousands = decimal === '.' ? ',' : '.';
+    t = t.split(thousands).join('').replace(decimal, '.');
+  } else if (lastComma > -1) {
+    // Only commas: "1,234" is a thousand, "12,50" is a decimal
+    t = /^\d{1,3}(,\d{3})+$/.test(t) ? t.replace(/,/g, '') : t.replace(',', '.');
+  } else if ((t.match(/\./g) || []).length > 1) {
+    // "1.234.567" uses dots for thousands
+    t = t.replace(/\./g, '');
+  }
+  return parseFloat(t);
+}
 
 // Finds amounts like "£300", "250 euros" or "EUR 40"
 function findAmounts(text) {
   const found = [];
-  for (const m of text.matchAll(/([£€$¥₹₱])\s?(\d[\d,]*(?:\.\d+)?)/g)) {
+  for (const m of text.matchAll(/([£€$¥₹₱])\s?(\d(?:[\d.,]*\d)?)/g)) {
     found.push({ value: toNum(m[2]), currency: toCode(m[1]), index: m.index });
   }
-  for (const m of text.matchAll(/(\d[\d,]*(?:\.\d+)?)\s?([A-Za-zł]+)/g)) {
+  for (const m of text.matchAll(/(\d(?:[\d.,]*\d)?)\s?([A-Za-zł]+)/g)) {
     const code = toCode(m[2]);
     if (code) found.push({ value: toNum(m[1]), currency: code, index: m.index });
   }
-  for (const m of text.matchAll(/\b([A-Z]{3})\s?(\d[\d,]*(?:\.\d+)?)/g)) {
+  for (const m of text.matchAll(/\b([A-Z]{3})\s?(\d(?:[\d.,]*\d)?)/g)) {
     const code = toCode(m[1]);
     if (code) found.push({ value: toNum(m[2]), currency: code, index: m.index });
   }
@@ -295,9 +326,11 @@ function parseRateOffer(text) {
   if (!offeredRate || !from || !to || from === to) return null;
 
   let rest = text.replace(matched, ' ');
-  const fee = parseFee(rest);
+  // Remove other lines of a rate board ("GBP 1 = USD 1.18") so they aren't read as the amount
+  rest = rest.replace(/(?:[£€$¥₹₱]|[A-Z]{3})\s?1\s*=\s*(?:[£€$¥₹₱]|[A-Z]{3})?\s?\d+(?:\.\d+)?(?:\s*[A-Z]{3})?/g, ' ');
+  const feeInfo = parseFee(rest);
   // Remove the fee so it isn't mistaken for the amount
-  rest = rest.replace(/(?:fee|commission|charge)\D{0,15}?\d+(?:\.\d+)?|[£€$¥₹₱]?\d+(?:\.\d+)?\s*(?:[A-Za-z]+\s)?(?:fee|commission)/i, ' ');
+  if (feeInfo.value) rest = rest.replace(/\d+(?:\.\d+)?\s?%\s*(?:fee|commission|charge)|(?:fee|commission|charge)\s*(?:of\s*)?\d+(?:\.\d+)?\s?%|(?:fee|commission|charge)[^\d,;.%]{0,12}?\d+(?:\.\d+)?|[£€$¥₹₱]?\d+(?:\.\d+)?\s*(?:pounds?|euros?|dollars?)?\s*(?:fee|commission)/i, ' ');
   const amounts = findAmounts(rest);
   const inFrom = amounts.find((a) => a.currency === from);
   const inTo = amounts.find((a) => a.currency === to);
@@ -305,13 +338,24 @@ function parseRateOffer(text) {
   if (inFrom) amount = inFrom.value;
   else if (inTo) amount = inTo.value / offeredRate;
 
-  return { type: 'rate_check', amount, from, to, offeredRate, fee };
+  const fee = feeInfo.percent ? (amount * feeInfo.value) / 100 : feeInfo.value;
+  return {
+    type: 'rate_check', amount, from, to, offeredRate, fee,
+    feePercent: feeInfo.percent ? feeInfo.value : null,
+    amountGuessed: !inFrom && !inTo,
+  };
 }
 
+// Finds a fee: either an amount ("£5 fee") or a percentage ("2% fee")
 function parseFee(text) {
-  const m = text.match(/(?:fee|commission|charge)\D{0,15}?(\d+(?:\.\d+)?)/i)
-    || text.match(/(\d+(?:\.\d+)?)\s*(?:[A-Za-z]+\s)?(?:fee|commission)/i);
-  return m ? toNum(m[1]) : 0;
+  // "No commission", "zero fees", "fee-free" mean no fee
+  if (/\b(?:no|zero|0%?)\s+(?:fees?|commission)|(?:fee|commission)[- ]free/i.test(text)) return { value: 0, percent: false };
+  const pct = text.match(/(\d+(?:\.\d+)?)\s?%\s*(?:fee|commission|charge)/i)
+    || text.match(/(?:fee|commission|charge)\s*(?:of\s*)?(\d+(?:\.\d+)?)\s?%/i);
+  if (pct) return { value: toNum(pct[1]), percent: true };
+  const m = text.match(/(?:fee|commission|charge)[^\d,;.%]{0,12}?(\d+(?:\.\d+)?)(?!\s?%)/i)
+    || text.match(/(\d+(?:\.\d+)?)\s*(?:pounds?|euros?|dollars?)?\s*(?:fee|commission)/i);
+  return { value: m ? toNum(m[1]) : 0, percent: false };
 }
 
 // ---------- Scam warning signs ----------
@@ -320,21 +364,21 @@ const SCAM_RULES = [
   { re: /urgent|immediately|right now|today only|within \d* ?hours?|asap|last chance/i,
     reason: "Pressure to pay quickly. Scammers rush you so you don't stop to check." },
   { re: /(bank|account|payment) details (have )?(changed|been updated|updated)|new (bank )?account|changed (our|my|their) (bank|account)/i,
-    reason: 'Says the bank details have changed. This is one of the most common invoice and landlord scams.' },
+    reason: 'Says the bank details have changed. Changed payment details are a common sign of invoice and rental scams.' },
   { re: /deposit|holding fee|secure the (flat|room|property|house)|before (the )?viewing|without (a )?viewing/i,
-    reason: 'Asks for a deposit to "secure" a place. Fake rental listings often do this before you\'ve seen it.' },
+    reason: 'Asks for a deposit to "secure" a place, possibly before you\'ve seen it. This is a common sign of rental scams.' },
   { re: /gift ?cards?|itunes|steam card|crypto|bitcoin|usdt/i,
-    reason: 'Asks for gift cards or crypto. Real companies and landlords never ask for these.' },
+    reason: 'Asks to be paid in gift cards, vouchers or crypto. Banks, landlords and authorities like HMRC don\'t ask for payment this way.' },
   { re: /overpa(id|yment)|refund the difference|sent (you )?too much/i,
     reason: 'An "overpayment" refund request. A classic trick to get you to send money back.' },
   { re: /verify your (account|identity|details)|account (will be )?(suspended|locked|closed)|click (the|this) link/i,
     reason: 'Threatens your account or asks you to click a link to "verify".' },
   { re: /(hmrc|police|home office|visa|tax).{0,60}(fine|arrest|deport|penalty)|(fine|arrest|deport|penalty).{0,60}(hmrc|police|home office|visa|tax)/i,
-    reason: "Claims to be an authority threatening fines, arrest or your visa. Real authorities don't demand payment by message." },
+    reason: 'Threatens fines, arrest or your visa. HMRC says it never threatens arrest, so this is a strong warning sign.' },
   { re: /don'?t tell|keep (this|it) (secret|between us)|confidential/i,
     reason: 'Asks you to keep it secret. A big warning sign.' },
   { re: /western union|moneygram|friends and family/i,
-    reason: 'Asks for a payment method with no protection if something goes wrong.' },
+    reason: 'Asks for a payment method that is hard to reverse if something goes wrong.' },
   { re: /(mum|mom|dad).{0,40}new (phone|number)|new (phone|number).{0,40}(mum|mom|dad)/i,
     reason: '"New number" family message. A common impersonation scam.' },
 ];
@@ -384,6 +428,11 @@ async function renderResult(result) {
   switch (result.type) {
     case 'convert': return renderConvert(result);
     case 'rate_check': return renderRate(result);
+    case 'both': {
+      const parts = [];
+      for (const part of result.results) parts.push(await renderResult({ ...part, userText: result.userText }));
+      return parts.join('');
+    }
     case 'scam_check': return renderScam(result);
     default: return messageCard(result.text || "I couldn't understand that. Try including an amount, like €250.");
   }
@@ -406,20 +455,27 @@ async function renderConvert({ amount, from, to }) {
         <svg viewBox="0 0 40 20"><path d="M2 10h34m-8-7l8 7-8 7" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span class="coin-chip to">${to}</span>
       </div>
+      <p class="read-as">Read as: converting ${money(amount, from)} into ${to}. If that's not right, type it again more clearly.</p>
       <div class="card-label">${money(amount, from)} is worth</div>
       <div class="big">${money(converted, to)}</div>
       <div class="rows">
         <div class="row"><span>Exchange rate</span><span>1 ${from} = ${rate.toFixed(4)} ${to}</span></div>
         <div class="row"><span>The other way</span><span>1 ${to} = ${(1 / rate).toFixed(4)} ${from}</span></div>
       </div>
-      <p class="note-small">This is the mid-market rate, the fairest rate there is. Banks and exchange desks usually give you less.</p>
+      <p class="note-small">This is the mid-market rate: the midpoint between the price to buy and the price to sell a currency. Banks and exchange desks often give you less.</p>
       ${wiseLink(from, to, amount)}
-      <div class="meta">Mid-market rate from ${source}, ${formatDate(date)}</div>
+      ${saveButton({
+        kind: 'Conversion',
+        headline: `${money(amount, from)} is worth ${money(converted, to)}`,
+        rows: [['Exchange rate', `1 ${from} = ${rate.toFixed(4)} ${to}`], ['The other way', `1 ${to} = ${(1 / rate).toFixed(4)} ${from}`]],
+        notes: [RATE_NOTE(source, date)],
+      })}
+      ${goodToKnow([RATE_NOTE(source, date)])}
     </div>`;
 }
 
 // ---------- Rate check ----------
-async function renderRate({ amount, from, to, offeredRate, fee = 0 }) {
+async function renderRate({ amount, from, to, offeredRate, fee = 0, feePercent = null, amountGuessed = false }) {
   const { rate: realRate, date, source } = await getRate(from, to);
 
   // If the rate looks upside down (e.g. 0.87 instead of 1.15), flip it
@@ -438,15 +494,22 @@ async function renderRate({ amount, from, to, offeredRate, fee = 0 }) {
 
   const verdict = percent < 1 ? 'safe' : percent < 3 ? 'caution' : 'danger';
   const labels = { safe: 'Fair rate', caution: 'Check first: pricey', danger: 'Stop: rip-off rate' };
+  const rateNotes = [
+    RATE_NOTE(source, date),
+    "Fair, pricey and rip-off are PayProoof's own guide, not an official standard: under 1%, 1% to 3%, and over 3% less than the real rate.",
+    ...(amountGuessed ? ['No amount was found, so this check uses 100 as an example.'] : []),
+  ];
   const advice = {
-    safe: 'This is close to the real rate. Good to go.',
+    safe: 'This is close to the real rate.',
     caution: "You're paying a noticeable markup. Compare with a cheaper provider first.",
     danger: "You're losing a lot here. Avoid this if you can and use a provider that gives the real rate.",
   };
 
+  const feeText = fee ? `, with a ${money(fee, from)} fee${feePercent ? `, which is ${feePercent}% of the amount` : ''}` : ', with no fee';
   return `
     <div class="card">
       ${verdictBadge(verdict, labels[verdict])}
+      <p class="read-as">Read as: exchanging ${money(amount, from)} into ${to} at 1 ${from} = ${offeredRate.toFixed(4)} ${to}${feeText}. If that's not right, type it again more clearly.</p>
       <div class="card-label">Hidden cost of this exchange</div>
       <div class="big">${money(lossInFrom, from)}</div>
       <div class="sub">That's ${percent.toFixed(1)}% less than you should get.</div>
@@ -465,19 +528,35 @@ async function renderRate({ amount, from, to, offeredRate, fee = 0 }) {
       </div>
       ${note}
       ${verdict !== 'safe' ? wiseLink(from, to, amount) : ''}
+      ${saveButton({
+        kind: 'Rate check',
+        verdict,
+        verdictLabel: labels[verdict],
+        headline: `Hidden cost: ${money(lossInFrom, from)}, ${percent.toFixed(1)}% less than the real rate`,
+        rows: [
+          ['You exchange', money(amount, from)],
+          ['Rate offered', `1 ${from} = ${offeredRate.toFixed(4)} ${to}`],
+          ['Real rate', `1 ${from} = ${realRate.toFixed(4)} ${to}`],
+          ...(fee ? [['Fee', money(fee, from)]] : []),
+          ["You'd get", money(willGet, to)],
+          ['At the real rate', money(shouldGet, to)],
+        ],
+        steps: [advice[verdict]],
+        notes: rateNotes,
+      })}
       ${trustButton(`Hi, can you give me a second opinion before I pay? I'm about to change ${money(amount, from)} at a rate of 1 ${from} = ${offeredRate.toFixed(4)} ${to}${fee ? ` with a ${money(fee, from)} fee` : ''}. PayProoof says it's ${{ safe: 'a fair rate', caution: 'a pricey rate', danger: 'a rip-off rate' }[verdict]}: I'd get ${money(willGet, to)} instead of ${money(shouldGet, to)} at the real rate, so I'd lose about ${money(lossInFrom, from)}, which is ${percent.toFixed(1)}% of my money. Should I go ahead?`)}
-      <div class="meta">Mid-market rate from ${source}, ${formatDate(date)}</div>
+      ${goodToKnow(rateNotes)}
     </div>`;
 }
 
 // ---------- Scam check ----------
 function renderScam({ verdict, reasons = [], advice, userText = '' }) {
   verdict = normaliseVerdict(verdict);
-  const labels = { safe: 'Looks fine', caution: 'Check first', danger: "Stop: don't send this money" };
+  const labels = { safe: 'No warning signs found', caution: 'Check first', danger: "Stop: don't send this money" };
   const defaultAdvice = {
     safe: [
-      'No common scam warning signs were found.',
-      'Still only pay people you know or have checked yourself.',
+      "None of the common warning signs PayProoof looks for were found. This doesn't prove the person or the payment is genuine.",
+      'Only pay people you know, or confirm who they are using contact details you find yourself.',
     ],
     caution: [
       "Don't pay yet.",
@@ -486,11 +565,14 @@ function renderScam({ verdict, reasons = [], advice, userText = '' }) {
     ],
     danger: [
       "Don't send any money.",
-      'Check with the person or company using their official contact details.',
-      "If you've already paid, call your bank straight away. In the UK you can dial 159.",
+      'Check with the person or company using contact details you find yourself, not ones in this message.',
+      "If you've already paid, call your bank straight away. In the UK, calling 159 connects you to most major banks. If yours isn't covered, use the number on the back of your card.",
+      'Report it to Report Fraud at reportfraud.police.uk or on 0300 123 2040. In Scotland, call Police Scotland on 101.',
     ],
   };
   const steps = advice && advice.length ? advice : defaultAdvice[verdict];
+  const beforeYouPay = verdict === 'danger' ? [] : BEFORE_YOU_PAY;
+  const forThisSituation = situationTips(userText);
 
   return `
     <div class="card">
@@ -501,9 +583,314 @@ function renderScam({ verdict, reasons = [], advice, userText = '' }) {
         : '<p class="sub">None of the common warning signs were found.</p>'}
       <h3>What to do</h3>
       <ul>${steps.map((s) => `<li>${escapeHtml(s)}</li>`).join('')}</ul>
+      ${adviceList('Before you pay', beforeYouPay)}
+      ${adviceList('For this situation', forThisSituation)}
+      ${saveButton({
+        kind: 'Scam check',
+        verdict,
+        verdictLabel: labels[verdict],
+        reasons,
+        steps,
+        message: userText,
+        sections: [
+          { title: 'Before you pay', items: beforeYouPay },
+          { title: 'For this situation', items: forThisSituation },
+        ],
+        notes: [SCAM_NOTE, ADVICE_SOURCE],
+      })}
       ${trustButton(scamShareText(verdict, labels[verdict], reasons, userText))}
-      <div class="meta">A quick safety check, not a guarantee.</div>
+      ${goodToKnow([SCAM_NOTE, ADVICE_SOURCE])}
     </div>`;
+}
+
+// =====================================================================
+//  Good to know: honest limits shown under every result
+// =====================================================================
+
+const RATE_NOTE = (source, date) => source === 'Wise'
+  ? `Rate from Wise on ${formatDate(date)}.`
+  : `Rates come from ${source}, which publishes reference rates from central banks once each working day. This one is from ${formatDate(date)}. The price a provider actually gives you can differ slightly.`;
+
+// Advice checked against Take Five to Stop Fraud, UK Finance, GOV.UK and Which? in October 2026
+const BEFORE_YOU_PAY = [
+  "Take a moment. It's OK to refuse or ignore a request for money. Someone genuine won't rush or panic you.",
+  "When you pay by bank transfer, your bank checks the name against the account. If it says the name doesn't match, don't pay until you've contacted the person yourself, and be wary of anyone who tells you to ignore it.",
+  'If bank details have changed, phone the person or company on a number you already had, not one from the message.',
+];
+const RENT_TIP = 'Renting in England? Your landlord or letting agent must put your deposit in a government-approved protection scheme within 30 days of getting it. Ask which scheme they use, and view the place in person if you can. Wales, Scotland and Northern Ireland have their own rules and schemes.';
+const BUY_TIP = "Buying something? Paying by credit card for something that costs over £100 and up to £30,000 can give you extra protection under Section 75 of the Consumer Credit Act. This doesn't apply to debit cards.";
+const ADVICE_SOURCE = 'Advice is based on guidance from Take Five to Stop Fraud, UK Finance, GOV.UK and Which?, checked in October 2026.';
+
+// Extra advice that only appears when the message is about renting or buying
+function situationTips(text = '') {
+  const tips = [];
+  if (/\b(deposit|rent|renting|flat|room|landlord|tenan\w*|letting|lease|viewing|property)\b/i.test(text)) tips.push(RENT_TIP);
+  if (/\b(buy|buying|bought|purchase|order|seller|selling|for sale|marketplace|tickets?|item|delivery|parcel)\b/i.test(text)) tips.push(BUY_TIP);
+  return tips;
+}
+
+function adviceList(title, items) {
+  return items.length ? `<h3>${title}</h3><ul>${items.map((s) => `<li>${escapeHtml(s)}</li>`).join('')}</ul>` : '';
+}
+
+const SCAM_NOTE = 'This check looks for common warning signs. It can miss new kinds of scams and can flag genuine messages, so always confirm with the person or company directly before you pay.';
+
+function goodToKnow(notes) {
+  return `<div class="good-to-know"><strong>Good to know</strong><ul>${notes.map((n) => `<li>${escapeHtml(n)}</li>`).join('')}</ul></div>`;
+}
+
+// =====================================================================
+//  Save a PayProoof: turns a result into an image you can keep
+// =====================================================================
+
+const savedProofs = new Map();
+let proofCount = 0;
+
+function saveButton(record) {
+  proofCount += 1;
+  record.checkedAt = new Date();
+  savedProofs.set(String(proofCount), record);
+  return `<button type="button" class="save-btn" data-proof="${proofCount}">
+    <svg aria-hidden="true"><use href="#i-save"/></svg>Save a PayProoof</button>`;
+}
+
+[chat, document.getElementById('compareResults')].forEach((area) => {
+  area.addEventListener('click', (e) => {
+    const btn = e.target.closest('.save-btn');
+    if (btn) downloadProof(savedProofs.get(btn.dataset.proof));
+  });
+});
+
+// Splits text into lines that fit a width
+function wrapText(ctx, text, maxWidth) {
+  const words = String(text).split(/\s+/);
+  const lines = [];
+  let line = '';
+  words.forEach((word) => {
+    const test = line ? `${line} ${word}` : word;
+    if (ctx.measureText(test).width > maxWidth && line) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = test;
+    }
+  });
+  if (line) lines.push(line);
+  return lines;
+}
+
+// Draws the verdict shape: circle, triangle or octagon
+function drawVerdictShape(ctx, verdict, x, y, size, colour) {
+  ctx.fillStyle = colour;
+  ctx.beginPath();
+  const r = size / 2;
+  if (verdict === 'safe') {
+    ctx.arc(x + r, y + r, r, 0, Math.PI * 2);
+  } else if (verdict === 'caution') {
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + size, y + size);
+    ctx.lineTo(x, y + size);
+  } else {
+    for (let i = 0; i < 8; i++) {
+      const a = Math.PI / 8 + (i * Math.PI) / 4;
+      ctx.lineTo(x + r + r * Math.cos(a), y + r + r * Math.sin(a));
+    }
+  }
+  ctx.closePath();
+  ctx.fill();
+
+  // The mark inside each shape: a tick, an exclamation mark or a cross
+  ctx.lineWidth = size * 0.12;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  if (verdict === 'safe') {
+    ctx.strokeStyle = '#ffffff';
+    ctx.moveTo(x + size * 0.28, y + size * 0.52);
+    ctx.lineTo(x + size * 0.44, y + size * 0.68);
+    ctx.lineTo(x + size * 0.72, y + size * 0.36);
+  } else if (verdict === 'caution') {
+    ctx.strokeStyle = '#1a1a1a';
+    ctx.moveTo(x + r, y + size * 0.38);
+    ctx.lineTo(x + r, y + size * 0.62);
+    ctx.moveTo(x + r, y + size * 0.8);
+    ctx.lineTo(x + r, y + size * 0.8);
+  } else {
+    ctx.strokeStyle = '#ffffff';
+    ctx.moveTo(x + size * 0.34, y + size * 0.34);
+    ctx.lineTo(x + size * 0.66, y + size * 0.66);
+    ctx.moveTo(x + size * 0.66, y + size * 0.34);
+    ctx.lineTo(x + size * 0.34, y + size * 0.66);
+  }
+  ctx.stroke();
+}
+
+function drawProof(record) {
+  const css = getComputedStyle(document.documentElement);
+  const col = (name, fallback) => css.getPropertyValue(name).trim() || fallback;
+  const dark = col('--band-dark', '#1e1b4b');
+  const bright = col('--band-bright', '#f5ebdd');
+  const ink = col('--ink', '#1b1838');
+  const muted = col('--muted', '#57537a');
+  const verdictColour = { safe: col('--safe', '#3f7d12'), caution: col('--caution', '#e0a82e'), danger: col('--danger', '#b3125a') };
+  const font = col('--font-body', 'sans-serif');
+
+  const W = 1080;
+  const P = 70;
+  const textW = W - P * 2;
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+
+  // Work out every line first, so we know how tall the image needs to be
+  const blocks = [];
+  const add = (type, text, size, weight = 400, colour = ink, gap = 10) => blocks.push({ type, text, size, weight, colour, gap });
+  const when = record.checkedAt.toLocaleString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+  add('text', record.kind, 30, 700, muted, 6);
+  if (record.verdict) blocks.push({ type: 'verdict', verdict: record.verdict, text: record.verdictLabel, gap: 24 });
+  if (record.headline) add('text', record.headline, 40, 700, ink, 24);
+  (record.rows || []).forEach(([label, value]) => blocks.push({ type: 'row', label, value, gap: 4 }));
+  if (record.rows && record.rows.length) blocks.push({ type: 'space', h: 20 });
+  if (record.reasons) {
+    add('heading', 'Warning signs found', 30, 700, ink, 8);
+    (record.reasons.length ? record.reasons : ['None of the common warning signs were found.']).forEach((r) => add('bullet', r, 26, 400, ink, 6));
+    blocks.push({ type: 'space', h: 16 });
+  }
+  if (record.message) {
+    add('heading', 'The message checked', 30, 700, ink, 8);
+    add('text', `"${record.message.length > 500 ? `${record.message.slice(0, 500)}…` : record.message}"`, 24, 400, muted, 16);
+  }
+  if (record.steps && record.steps.length) {
+    add('heading', 'What to do', 30, 700, ink, 8);
+    record.steps.forEach((s) => add('bullet', s, 26, 400, ink, 6));
+    blocks.push({ type: 'space', h: 16 });
+  }
+  (record.sections || []).filter((s) => s.items && s.items.length).forEach((s) => {
+    add('heading', s.title, 30, 700, ink, 8);
+    s.items.forEach((item) => add('bullet', item, 26, 400, ink, 6));
+    blocks.push({ type: 'space', h: 16 });
+  });
+  blocks.push({ type: 'notes', notes: ['PayProoof is a quick check, not financial or legal advice.', ...(record.notes || [])] });
+
+  // Measure
+  const lineH = (size) => Math.round(size * 1.4);
+  let height = 170 + P;
+  const prepared = blocks.map((b) => {
+    if (b.type === 'text' || b.type === 'heading' || b.type === 'bullet') {
+      ctx.font = `${b.weight} ${b.size}px ${font}`;
+      b.lines = wrapText(ctx, b.text, b.type === 'bullet' ? textW - 34 : textW);
+      b.h = b.lines.length * lineH(b.size) + b.gap;
+    } else if (b.type === 'verdict') {
+      b.h = 64 + b.gap;
+    } else if (b.type === 'row') {
+      b.h = 46 + b.gap;
+    } else if (b.type === 'space') {
+      b.h = b.h;
+    } else if (b.type === 'notes') {
+      ctx.font = `400 23px ${font}`;
+      b.lines = b.notes.map((n) => wrapText(ctx, n, textW - 60));
+      b.h = 70 + b.lines.reduce((sum, l) => sum + l.length * lineH(23) + 8, 0) + 30;
+    }
+    height += b.h;
+    return b;
+  });
+  height += 90;
+
+  canvas.width = W;
+  canvas.height = height;
+
+  // Background and header
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, W, height);
+  ctx.fillStyle = dark;
+  ctx.fillRect(0, 0, W, 140);
+  ctx.fillStyle = bright;
+  ctx.font = `800 48px ${font}`;
+  ctx.textBaseline = 'middle';
+  ctx.fillText('PayProoof', P, 70);
+  ctx.font = `400 24px ${font}`;
+  ctx.textAlign = 'right';
+  ctx.fillText(`Checked ${when}`, W - P, 70);
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+
+  let y = 140 + 60;
+  prepared.forEach((b) => {
+    if (b.type === 'text' || b.type === 'heading') {
+      ctx.font = `${b.weight} ${b.size}px ${font}`;
+      ctx.fillStyle = b.colour;
+      b.lines.forEach((l, i) => ctx.fillText(l, P, y + i * lineH(b.size) + b.size));
+    } else if (b.type === 'bullet') {
+      ctx.font = `${b.weight} ${b.size}px ${font}`;
+      ctx.fillStyle = b.colour;
+      ctx.fillText('•', P + 4, y + b.size);
+      b.lines.forEach((l, i) => ctx.fillText(l, P + 34, y + i * lineH(b.size) + b.size));
+    } else if (b.type === 'verdict') {
+      drawVerdictShape(ctx, b.verdict, P, y, 56, verdictColour[b.verdict]);
+      ctx.font = `700 36px ${font}`;
+      ctx.fillStyle = ink;
+      ctx.fillText(b.text, P + 76, y + 42);
+    } else if (b.type === 'row') {
+      ctx.strokeStyle = '#e4e2ee';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(P, y + 46);
+      ctx.lineTo(W - P, y + 46);
+      ctx.stroke();
+      ctx.font = `400 26px ${font}`;
+      ctx.fillStyle = muted;
+      ctx.fillText(b.label, P, y + 32);
+      ctx.font = `700 26px ${font}`;
+      ctx.fillStyle = ink;
+      ctx.textAlign = 'right';
+      ctx.fillText(b.value, W - P, y + 32);
+      ctx.textAlign = 'left';
+    } else if (b.type === 'notes') {
+      ctx.fillStyle = '#f6f4fb';
+      ctx.strokeStyle = muted;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.roundRect(P, y, textW, b.h - 20, 18);
+      ctx.fill();
+      ctx.stroke();
+      ctx.font = `700 26px ${font}`;
+      ctx.fillStyle = ink;
+      ctx.fillText('Good to know', P + 30, y + 46);
+      let ny = y + 70;
+      ctx.font = `400 23px ${font}`;
+      b.lines.forEach((lines) => {
+        lines.forEach((l, i) => ctx.fillText(l, P + 30, ny + i * lineH(23) + 23));
+        ny += lines.length * lineH(23) + 8;
+      });
+    }
+    y += b.h;
+  });
+
+  ctx.font = `400 22px ${font}`;
+  ctx.fillStyle = muted;
+  ctx.fillText('Made with PayProoof. Keep this as a record of what you checked.', P, height - 45);
+  return canvas;
+}
+
+function downloadProof(record) {
+  if (!record) return;
+  const canvas = drawProof(record);
+  const t = record.checkedAt;
+  const pad = (n) => String(n).padStart(2, '0');
+  const stamp = `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}-${pad(t.getHours())}${pad(t.getMinutes())}`;
+  canvas.toBlob((blob) => {
+    const file = new File([blob], `payprooof-${stamp}.png`, { type: 'image/png' });
+    // On phones, offer the share menu so it can go straight to Photos or Files
+    if (navigator.canShare && navigator.canShare({ files: [file] }) && matchMedia('(hover: none)').matches) {
+      navigator.share({ files: [file], title: 'My PayProoof' }).catch(() => {});
+      return;
+    }
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = file.name;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(link.href), 2000);
+  }, 'image/png');
 }
 
 // =====================================================================
@@ -703,6 +1090,11 @@ async function updateCompare() {
 
   offers.sort((a, b) => b.received - a.received);
   const labels = { safe: 'Fair', caution: 'Pricey', danger: 'Rip-off' };
+  const compareNotes = [
+    'The offers are the rates and fees you typed in. Check them with each provider before you pay, as prices can change during the day.',
+    RATE_NOTE(real.source, real.date),
+    "Fair, pricey and rip-off are PayProoof's own guide, not an official standard: under 1%, 1% to 3%, and over 3% less than the real rate.",
+  ];
 
   compareResults.innerHTML = `
     <ul class="providers">
@@ -724,7 +1116,23 @@ async function updateCompare() {
       <div class="compare-summary">
         <strong>${money(offers[0].received - offers[offers.length - 1].received, to)}</strong>
         <span>more with ${escapeHtml(offers[0].name)} than with ${escapeHtml(offers[offers.length - 1].name)}</span>
-      </div>` : ''}`;
+      </div>` : ''}
+    ${saveButton({
+      kind: 'Comparison',
+      headline: offers.length > 1
+        ? `${offers[0].name} gives the most: ${money(offers[0].received, to)}`
+        : `${offers[0].name}: ${money(offers[0].received, to)}`,
+      rows: [
+        ['You send', money(amount, from)],
+        ['At the real rate, with no fees', money(fair, to)],
+        ...offers.map((o) => [
+          `${o.name}: rate ${o.rate.toFixed(4)}, fee ${money(o.fee, from)}`,
+          money(o.received, to),
+        ]),
+      ],
+      notes: compareNotes,
+    })}
+    ${goodToKnow(compareNotes)}`;
 }
 
 // Wait until the user stops typing before updating
@@ -773,19 +1181,21 @@ function addBotCard(html) {
   div.innerHTML = html;
 
   // Every result gets a "Read aloud" button
-  const card = div.querySelector('.card');
-  if (card && 'speechSynthesis' in window) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'speak-btn';
-    btn.innerHTML = '<svg aria-hidden="true"><use href="#i-sound"/></svg> Read aloud';
-    btn.addEventListener('click', () => speak(cardText(card)));
-    card.appendChild(btn);
+  const cards = [...div.querySelectorAll('.card')];
+  if ('speechSynthesis' in window) {
+    cards.forEach((card) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'speak-btn';
+      btn.innerHTML = '<svg aria-hidden="true"><use href="#i-sound"/></svg> Read aloud';
+      btn.addEventListener('click', () => speak(cardText(card)));
+      card.appendChild(btn);
+    });
   }
 
   chat.appendChild(div);
   scrollDown();
-  if (settings.readAloud && card) speak(cardText(card));
+  if (settings.readAloud && cards.length) speak(cards.map(cardText).join(' '));
 }
 
 function addLoading() {
