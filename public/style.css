@@ -1,5 +1,5 @@
 /* =====================================================================
-   PayProoof styles
+   payprooof styles
    Change the colours in :root to restyle the whole site.
    ===================================================================== */
 
@@ -13,7 +13,7 @@
   --deep:    #1e1b4b;   /* dark indigo: headings, buttons, banknote */
   --ink:     #1b1838;   /* body text */
   --muted:   #57537a;   /* secondary text */
-  --accent:  #a3e635;   /* lime green highlights */
+  --accent:  #f5ebdd;   /* cream highlights */
 
   /* Verdicts: always paired with a shape, word and pattern */
   --safe:    #3f7d12;
@@ -257,7 +257,7 @@ html[data-contrast] :focus-visible { outline: 4px solid #000; box-shadow: 0 0 0 
   counter-increment: step;
   display: grid; grid-template-columns: 160px 1fr; gap: 1.5rem; align-items: center;
   padding-left: 72px;
-  opacity: 0.55;
+  opacity: 0.6;
   transition: opacity 0.4s;
 }
 .step.is-reached { opacity: 1; }
@@ -586,7 +586,7 @@ html[data-contrast] :focus-visible { outline: 4px solid #000; box-shadow: 0 0 0 
    ===================================================================== */
 :root {
   --band-dark: #1e1b4b;     --on-dark: #ffffff;   --on-dark-muted: #ddd6fe;
-  --band-bright: #a3e635;   --on-bright: #1e1b4b;
+  --band-bright: #f5ebdd;   --on-bright: #1e1b4b;
   --band-soft: #c084fc;     --on-soft: #1e1b4b;
   --band-light: #f8fafc;
 }
@@ -628,7 +628,7 @@ html[data-contrast] {
 .access-btn { background: var(--band-bright); color: var(--on-bright); border-color: var(--band-bright); }
 .site-footer { background: var(--band-dark); color: var(--on-dark-muted); border-top: 0; }
 
-/* Top section: lime button on indigo, soft purple banknote */
+/* Top section: cream button on indigo, soft purple banknote */
 .band-dark .btn-primary { background: var(--band-bright); color: var(--on-bright); }
 .band-dark .btn-primary:hover { filter: brightness(1.08); background: var(--band-bright); }
 .band-dark .btn-quiet { color: var(--on-dark); border-color: var(--band-soft); }
@@ -644,7 +644,7 @@ html[data-contrast] {
 .note-lens { border-color: var(--on-soft); box-shadow: 0 0 0 2px #fff, 0 10px 24px rgba(0, 0, 0, 0.35); }
 .note-lens::after { background: var(--on-soft); }
 
-/* How it works on lime */
+/* How it works on cream */
 .band-bright .step p { color: var(--on-bright); }
 .band-bright .step h3::before { color: var(--on-bright); }
 .band-bright .track { background: color-mix(in srgb, var(--on-bright) 18%, transparent); }
@@ -664,3 +664,7 @@ html[data-contrast] {
   .band-soft .checker { box-shadow: none; }
 }
 .band-bright .step-art g > :first-child { stroke: var(--on-bright); stroke-width: 2.5; }
+
+/* Faded steps stay readable on coloured backgrounds */
+.band-bright .step { opacity: 0.72; }
+.band-bright .step.is-reached { opacity: 1; }

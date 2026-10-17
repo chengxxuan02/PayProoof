@@ -1,5 +1,5 @@
 // =====================================================================
-//  PayProoof - frontend logic
+//  payprooof - frontend logic
 //
 //  Sections in this file:
 //   1. The checker (mode buttons, examples, photos, sending messages)
@@ -115,7 +115,7 @@ form.addEventListener('submit', async (event) => {
   } catch (err) {
     console.error(err);
     loading.remove();
-    addBotCard(messageCard("That check didn't work. Check your internet connection and try again."));
+    addBotCard(messageCard("Today's exchange rate didn't load. Wait a moment and try again."));
   }
 });
 
@@ -199,9 +199,8 @@ function localAnalyse(text, home, mode) {
 // ---------- Understanding currencies in normal writing ----------
 
 // Currencies the live rate service supports
-const SUPPORTED = ['AUD', 'BGN', 'BRL', 'CAD', 'CHF', 'CNY', 'CZK', 'DKK', 'EUR', 'GBP', 'HKD', 'HUF',
-  'IDR', 'ILS', 'INR', 'ISK', 'JPY', 'KRW', 'MXN', 'MYR', 'NOK', 'NZD', 'PHP', 'PLN', 'RON', 'SEK',
-  'SGD', 'THB', 'TRY', 'USD', 'ZAR'];
+const SUPPORTED = ['AED', 'AUD', 'BRL', 'CAD', 'CHF', 'CNY', 'EUR', 'GBP', 'HKD', 'INR',
+  'JPY', 'MXN', 'MYR', 'PHP', 'SAR', 'SEK', 'SGD', 'THB', 'USD', 'ZAR'];
 
 // Words and symbols people use for each currency
 const CURRENCY_WORDS = {
@@ -210,13 +209,15 @@ const CURRENCY_WORDS = {
   '$': 'USD', dollar: 'USD', dollars: 'USD', usd: 'USD',
   '¥': 'JPY', yen: 'JPY', jpy: 'JPY',
   '₹': 'INR', rupee: 'INR', rupees: 'INR', inr: 'INR',
+  '₱': 'PHP', php: 'PHP',
   yuan: 'CNY', rmb: 'CNY', cny: 'CNY', renminbi: 'CNY',
-  '₺': 'TRY', lira: 'TRY',
-  zloty: 'PLN', 'zł': 'PLN', 'złoty': 'PLN', pln: 'PLN',
-  franc: 'CHF', francs: 'CHF', chf: 'CHF',
+  dirham: 'AED', dirhams: 'AED', aed: 'AED',
+  riyal: 'SAR', riyals: 'SAR', sar: 'SAR',
   ringgit: 'MYR', myr: 'MYR',
-  won: 'KRW', krw: 'KRW', baht: 'THB', thb: 'THB', rand: 'ZAR', zar: 'ZAR',
-  aud: 'AUD', cad: 'CAD', sgd: 'SGD', hkd: 'HKD', nzd: 'NZD', sek: 'SEK', nok: 'NOK', dkk: 'DKK',
+  krona: 'SEK', kronor: 'SEK', sek: 'SEK',
+  franc: 'CHF', francs: 'CHF', chf: 'CHF',
+  baht: 'THB', thb: 'THB', rand: 'ZAR', zar: 'ZAR', reais: 'BRL', brl: 'BRL',
+  aud: 'AUD', cad: 'CAD', sgd: 'SGD', hkd: 'HKD', mxn: 'MXN',
 };
 
 function toCode(token) {
@@ -233,7 +234,7 @@ const toNum = (s) => parseFloat(String(s).replace(/,/g, ''));
 // Finds amounts like "£300", "250 euros" or "EUR 40"
 function findAmounts(text) {
   const found = [];
-  for (const m of text.matchAll(/([£€$¥₹₺])\s?(\d[\d,]*(?:\.\d+)?)/g)) {
+  for (const m of text.matchAll(/([£€$¥₹₱])\s?(\d[\d,]*(?:\.\d+)?)/g)) {
     found.push({ value: toNum(m[2]), currency: toCode(m[1]), index: m.index });
   }
   for (const m of text.matchAll(/(\d[\d,]*(?:\.\d+)?)\s?([A-Za-zł]+)/g)) {
@@ -249,7 +250,7 @@ function findAmounts(text) {
 
 // Finds the currency to convert into: "in pounds", "to USD", "into euros"
 function findTarget(text) {
-  for (const m of text.matchAll(/\b(?:in|into|to)\s+([A-Za-zł£€$¥₹₺]+)/gi)) {
+  for (const m of text.matchAll(/\b(?:in|into|to)\s+([A-Za-zł£€$¥₹₱]+)/gi)) {
     const code = toCode(m[1]);
     if (code) return code;
   }
@@ -261,20 +262,20 @@ function parseRateOffer(text) {
   let offeredRate = null, from = null, to = null, matched = '';
 
   // "1.02 euros per pound", "1.02 EUR for each GBP"
-  for (const m of text.matchAll(/(\d+(?:\.\d+)?)\s*([A-Za-z€$£¥₹₺]+)\s*(?:per|for each|for every|for one|for a|for 1|to the|to a|to 1|=)\s*(?:1\s*)?([A-Za-z€$£¥₹₺]+)/gi)) {
+  for (const m of text.matchAll(/(\d+(?:\.\d+)?)\s*([A-Za-z€$£¥₹₱]+)\s*(?:per|for each|for every|for one|for a|for 1|to the|to a|to 1|=)\s*(?:1\s*)?([A-Za-z€$£¥₹₱]+)/gi)) {
     const t = toCode(m[2]), f = toCode(m[3]);
     if (t && f && t !== f) { offeredRate = toNum(m[1]); to = t; from = f; matched = m[0]; break; }
   }
 
   // "£1 = €1.05" or "1 GBP = 1.05 EUR"
   if (!offeredRate) {
-    const m = text.match(/([£€$¥₹₺]|[A-Z]{3})\s?1\s*=\s*([£€$¥₹₺]|[A-Z]{3})?\s?(\d+(?:\.\d+)?)\s*([A-Z]{3})?/);
+    const m = text.match(/([£€$¥₹₱]|[A-Z]{3})\s?1\s*=\s*([£€$¥₹₱]|[A-Z]{3})?\s?(\d+(?:\.\d+)?)\s*([A-Z]{3})?/);
     if (m) { from = toCode(m[1]); to = toCode(m[2] || m[4]); offeredRate = toNum(m[3]); matched = m[0]; }
   }
 
   // "1 pound = 0.98 euro", "1 GBP = 1.10 EUR", "1 pound gets you 1.05 euros"
   if (!offeredRate) {
-    const m = text.match(/\b1\s*([A-Za-z€$£¥₹₺]+)\s*(?:=|is|gets?(?: you)?|buys?)\s*([€$£¥₹₺])?\s?(\d+(?:\.\d+)?)\s*([A-Za-z]+)?/i);
+    const m = text.match(/\b1\s*([A-Za-z€$£¥₹₱]+)\s*(?:=|is|gets?(?: you)?|buys?)\s*([€$£¥₹₱])?\s?(\d+(?:\.\d+)?)\s*([A-Za-z]+)?/i);
     if (m) {
       const f = toCode(m[1]), t = toCode(m[2] || m[4]);
       if (f && t && f !== t) { from = f; to = t; offeredRate = toNum(m[3]); matched = m[0]; }
@@ -295,7 +296,7 @@ function parseRateOffer(text) {
   let rest = text.replace(matched, ' ');
   const fee = parseFee(rest);
   // Remove the fee so it isn't mistaken for the amount
-  rest = rest.replace(/(?:fee|commission|charge)\D{0,15}?\d+(?:\.\d+)?|[£€$¥₹₺]?\d+(?:\.\d+)?\s*(?:[A-Za-z]+\s)?(?:fee|commission)/i, ' ');
+  rest = rest.replace(/(?:fee|commission|charge)\D{0,15}?\d+(?:\.\d+)?|[£€$¥₹₱]?\d+(?:\.\d+)?\s*(?:[A-Za-z]+\s)?(?:fee|commission)/i, ' ');
   const amounts = findAmounts(rest);
   const inFrom = amounts.find((a) => a.currency === from);
   const inTo = amounts.find((a) => a.currency === to);
@@ -356,10 +357,11 @@ async function getRate(from, to) {
     // No server
   }
 
-  const res = await fetch(`https://api.frankfurter.app/latest?from=${from}&to=${to}`);
-  if (!res.ok) throw new Error('Could not load the exchange rate');
+  const res = await fetch(`https://api.frankfurter.dev/v2/rate/${from.toLowerCase()}/${to.toLowerCase()}`);
+  if (!res.ok) throw new Error(`Frankfurter replied ${res.status}`);
   const data = await res.json();
-  return { rate: data.rates[to], date: data.date, source: 'the European Central Bank' };
+  if (!data.rate) throw new Error('No rate in the reply');
+  return { rate: data.rate, date: data.date, source: 'Frankfurter' };
 }
 
 // =====================================================================
@@ -445,7 +447,8 @@ async function renderRate({ amount, from, to, offeredRate, fee = 0 }) {
     <div class="card">
       ${verdictBadge(verdict, labels[verdict])}
       <div class="card-label">Hidden cost of this exchange</div>
-      <div class="big">${money(lossInFrom, from)} <span class="sub">(${percent.toFixed(1)}%)</span></div>
+      <div class="big">${money(lossInFrom, from)}</div>
+      <div class="sub">That's ${percent.toFixed(1)}% less than you should get.</div>
       <div class="sub">${advice[verdict]}</div>
       <div class="rate-bars" aria-hidden="true">
         <div class="rate-bar"><span>Real rate</span><div class="bar"><span style="width:100%"></span></div></div>
@@ -588,7 +591,7 @@ async function updateCompare() {
         ${providers.map((p, i) => `
           <li class="provider ${i === 0 ? 'best' : ''}">
             <div>
-              <div class="provider-name">${escapeHtml(p.name)}${live ? '' : ' (example)'}</div>
+              <div class="provider-name">${escapeHtml(p.name)}</div>
               ${i === 0 ? '<span class="provider-badge"><svg aria-hidden="true"><use href="#i-safe"/></svg>Most received</span>' : ''}
             </div>
             <div class="provider-rate">Rate ${p.rate.toFixed(4)}<br>Fee ${money(p.fee, from)}</div>
@@ -602,7 +605,7 @@ async function updateCompare() {
       </div>`;
   } catch (err) {
     console.error(err);
-    compareResults.innerHTML = "<p class=\"sub\">Couldn't load today's rate. Check your internet connection and try again.</p>";
+    compareResults.innerHTML = "<p class=\"sub\">Today's exchange rate didn't load. Wait a moment and change the amount to try again.</p>";
   }
 }
 
@@ -729,7 +732,7 @@ function loadSettings() {
 
 function saveSettings() {
   try {
-    localStorage.setItem('paypro0of-access', JSON.stringify(settings));
+    localStorage.setItem('payprooof-access', JSON.stringify(settings));
   } catch {
     // Saving isn't possible (e.g. private browsing). Settings still work for this visit.
   }

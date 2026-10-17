@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PayProoof</title>
+  <title>payprooof</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Lexend:wght@400;600&display=swap" rel="stylesheet">
@@ -11,7 +11,7 @@
 </head>
 <body>
 
-  <!-- ===== Icons (drawn once, reused everywhere with <use>) ===== -->
+  <!-- ===== Icons  drawn once, reused everywhere with <use>) ===== -->
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
     <symbol id="i-logo" viewBox="0 0 32 32"><rect x="2" y="6" width="28" height="20" rx="4" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M10 16.5l4 4 8-9" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-auto" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15.5 8.5l-2 5-5 2 2-5z" fill="currentColor"/></symbol>
@@ -32,9 +32,9 @@
 
   <!-- ===== Header ===== -->
   <header class="site-header">
-    <a class="logo" href="#top" aria-label="PayProoof home">
+    <a class="logo" href="#top" aria-label="payprooof home">
       <svg class="logo-mark" aria-hidden="true"><use href="#i-logo"/></svg>
-      <span>PayProoof</span>
+      <span>payprooof</span>
     </a>
     <nav class="site-nav" aria-label="Main">
       <a href="#how">How it works</a>
@@ -55,7 +55,7 @@
     <section class="hero">
       <div class="hero-copy">
         <h1>Know what a payment really costs before you make it.</h1>
-        <p class="lede">Paste a message, type an amount or snap a photo of a price. PayProoof converts it at the real rate, shows hidden exchange fees and spots the signs of a scam.</p>
+        <p class="lede">Paste a message, type an amount or snap a photo of a price. payprooof converts it at the real rate, shows hidden exchange fees and spots the signs of a scam.</p>
         <div class="hero-actions">
           <a href="#checker" class="btn btn-primary">Start a check</a>
           <a href="#how" class="btn btn-quiet">See how it works</a>
@@ -139,15 +139,25 @@
           <span>My currency</span>
           <select id="homeCurrency">
             <option value="GBP">GBP, British pound</option>
-            <option value="EUR">EUR, Euro</option>
-            <option value="USD">USD, US dollar</option>
-            <option value="INR">INR, Indian rupee</option>
-            <option value="CNY">CNY, Chinese yuan</option>
-            <option value="JPY">JPY, Japanese yen</option>
+            <option value="AED">AED, UAE dirham</option>
             <option value="AUD">AUD, Australian dollar</option>
+            <option value="BRL">BRL, Brazilian real</option>
             <option value="CAD">CAD, Canadian dollar</option>
-            <option value="PLN">PLN, Polish zloty</option>
-            <option value="TRY">TRY, Turkish lira</option>
+            <option value="CHF">CHF, Swiss franc</option>
+            <option value="CNY">CNY, Chinese yuan</option>
+            <option value="EUR">EUR, Euro</option>
+            <option value="HKD">HKD, Hong Kong dollar</option>
+            <option value="INR">INR, Indian rupee</option>
+            <option value="JPY">JPY, Japanese yen</option>
+            <option value="MXN">MXN, Mexican peso</option>
+            <option value="MYR">MYR, Malaysian ringgit</option>
+            <option value="PHP">PHP, Philippine peso</option>
+            <option value="SAR">SAR, Saudi riyal</option>
+            <option value="SEK">SEK, Swedish krona</option>
+            <option value="SGD">SGD, Singapore dollar</option>
+            <option value="THB">THB, Thai baht</option>
+            <option value="USD">USD, US dollar</option>
+            <option value="ZAR">ZAR, South African rand</option>
           </select>
         </label>
       </div>
@@ -215,7 +225,7 @@
       <div class="compare-panel">
         <form class="compare-form" id="compareForm">
           <label class="field">
-            <span>You send (<span id="compareFromCode">GBP</span>)</span>
+            <span>You send in <span id="compareFromCode">GBP</span></span>
             <input type="number" id="compareAmount" value="1000" min="1" step="any" inputmode="decimal">
           </label>
           <label class="field">
@@ -253,7 +263,7 @@
   </main>
 
   <footer class="site-footer">
-    <p>PayProoof is a quick safety check, not financial advice. Rates are mid-market rates from the European Central Bank.</p>
+    <p>payprooof is a quick safety check, not financial advice. Exchange rates are mid-market rates from Frankfurter.</p>
   </footer>
 
   <!-- ===== Accessibility settings ===== -->
@@ -277,7 +287,7 @@
     <label class="toggle"><input type="checkbox" data-setting="easyFont"> <span>Easy-read font</span></label>
     <label class="toggle"><input type="checkbox" data-setting="spacing"> <span>More space between lines and letters</span></label>
     <label class="toggle"><input type="checkbox" data-setting="contrast"> <span>High contrast</span></label>
-    <label class="toggle"><input type="checkbox" data-setting="cbPalette"> <span>Colour-blind theme (blue and orange)</span></label>
+    <label class="toggle"><input type="checkbox" data-setting="cbPalette"> <span>Colour-blind theme</span></label>
     <label class="toggle"><input type="checkbox" data-setting="reduceMotion"> <span>Reduce motion</span></label>
     <label class="toggle"><input type="checkbox" data-setting="readAloud"> <span>Read results aloud</span></label>
 
