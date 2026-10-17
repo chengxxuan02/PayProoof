@@ -1,5 +1,5 @@
 // =====================================================================
-//  PayCheck - frontend logic
+//  PayProoof - frontend logic
 //
 //  Sections in this file:
 //   1. The checker (mode buttons, examples, photos, sending messages)
@@ -8,9 +8,9 @@
 //   4. Accessibility settings
 //   5. Visual effects (banknote lens, scrolling coin)
 // =====================================================================
- 
+
 const BACKEND_URL = '/api/analyze';
- 
+
 // ---------- Find the parts of the page we need ----------
 const chat = document.getElementById('chat');
 const welcome = document.getElementById('welcome');
@@ -22,21 +22,21 @@ const previewImg = document.getElementById('previewImg');
 const removeImageBtn = document.getElementById('removeImage');
 const homeSelect = document.getElementById('homeCurrency');
 const modeButtons = document.querySelectorAll('.mode');
- 
+
 let currentMode = 'auto';
 let currentImage = null; // the attached photo
- 
+
 const PLACEHOLDERS = {
   auto: 'Type an amount, a rate or paste a message',
   convert: 'For example: How much is €250?',
   rate: 'For example: They offered 1.05 euros per pound for £300',
   scam: 'Paste the message or payment request here',
 };
- 
+
 // =====================================================================
 //  1. The checker
 // =====================================================================
- 
+
 // ---------- Mode buttons ----------
 modeButtons.forEach((btn) => {
   btn.addEventListener('click', () => {
@@ -51,7 +51,7 @@ modeButtons.forEach((btn) => {
     input.focus();
   });
 });
- 
+
 // ---------- Example buttons ----------
 document.querySelectorAll('.example').forEach((btn) => {
   btn.addEventListener('click', () => {
@@ -59,7 +59,7 @@ document.querySelectorAll('.example').forEach((btn) => {
     form.requestSubmit();
   });
 });
- 
+
 // ---------- Photo upload ----------
 // Phone photos are huge, so we shrink them before sending them to the AI
 imageInput.addEventListener('change', () => {
@@ -82,15 +82,15 @@ imageInput.addEventListener('change', () => {
   };
   reader.readAsDataURL(file);
 });
- 
+
 removeImageBtn.addEventListener('click', clearImage);
- 
+
 function clearImage() {
   currentImage = null;
   imageInput.value = '';
   preview.classList.add('hidden');
 }
- 
+
 // ---------- When the user presses Check ----------
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -100,12 +100,12 @@ form.addEventListener('submit', async (event) => {
     input.focus();
     return;
   }
- 
+
   if (welcome && welcome.isConnected) welcome.remove();
   addUserMessage(text, image);
   input.value = '';
   clearImage();
- 
+
   const loading = addLoading();
   try {
     const result = await analyse(text, image);
@@ -118,14 +118,14 @@ form.addEventListener('submit', async (event) => {
     addBotCard(messageCard("That check didn't work. Check your internet connection and try again."));
   }
 });
- 
+
 // =====================================================================
 //  2. Working out what the user wants, and showing the answer
 // =====================================================================
- 
+
 async function analyse(text, image) {
   const homeCurrency = homeSelect.value;
- 
+
   // Ask the AI backend first (the server from Stage 8)
   try {
     const res = await fetch(BACKEND_URL, {
@@ -137,26 +137,46 @@ async function analyse(text, image) {
   } catch (e) {
     // No backend running, so we use the built-in checker below
   }
- 
-  if (image && !text) {
-    return { type: 'message', text: "Reading photos needs the AI, which isn't connected. For now, type what the photo says." };
+
+  // No AI: read any text in the photo with Tesseract (free, runs in the browser)
+  if (image) {
+    const photoText = await readPhotoText(image);
+    if (!photoText && !text) {
+      return { type: 'message', text: "I couldn't find any text in that photo. Try a clearer, closer photo, or type what it says." };
+    }
+    text = `${text} ${photoText}`.trim();
   }
   return localAnalyse(text, homeCurrency, currentMode);
 }
- 
+
+// Reads the text in a photo. Tesseract downloads its reading data the first
+// time, so the first photo takes a few seconds longer.
+let photoReader = null;
+async function readPhotoText(image) {
+  if (!window.Tesseract) return '';
+  try {
+    if (!photoReader) photoReader = await Tesseract.createWorker('eng');
+    const { data } = await photoReader.recognize(image);
+    return data.text.replace(/\s+/g, ' ').trim();
+  } catch (err) {
+    console.error('Photo reading failed:', err);
+    return '';
+  }
+}
+
 // ---------- Built-in checker (works without the AI) ----------
- 
+
 function localAnalyse(text, home, mode) {
   const scamReasons = SCAM_RULES.filter((rule) => rule.re.test(text)).map((rule) => rule.reason);
   const rateOffer = parseRateOffer(text);
   const amounts = findAmounts(text);
- 
+
   // Scam check
   if (mode === 'scam' || (mode === 'auto' && scamReasons.length && !rateOffer)) {
     const verdict = scamReasons.length === 0 ? 'safe' : scamReasons.length === 1 ? 'caution' : 'danger';
     return { type: 'scam_check', verdict, reasons: scamReasons };
   }
- 
+
   // Rate check
   if (mode === 'rate' || (mode === 'auto' && rateOffer)) {
     if (!rateOffer) {
@@ -164,7 +184,7 @@ function localAnalyse(text, home, mode) {
     }
     return rateOffer;
   }
- 
+
   // Convert
   if (amounts.length) {
     const first = amounts[0];
@@ -172,17 +192,17 @@ function localAnalyse(text, home, mode) {
     if (to === first.currency) to = first.currency === home ? (home === 'EUR' ? 'GBP' : 'EUR') : home;
     return { type: 'convert', amount: first.value, from: first.currency, to };
   }
- 
+
   return { type: 'message', text: 'Include an amount and a currency, for example "How much is €250?", or paste a message to check it for scams.' };
 }
- 
+
 // ---------- Understanding currencies in normal writing ----------
- 
+
 // Currencies the live rate service supports
 const SUPPORTED = ['AUD', 'BGN', 'BRL', 'CAD', 'CHF', 'CNY', 'CZK', 'DKK', 'EUR', 'GBP', 'HKD', 'HUF',
   'IDR', 'ILS', 'INR', 'ISK', 'JPY', 'KRW', 'MXN', 'MYR', 'NOK', 'NZD', 'PHP', 'PLN', 'RON', 'SEK',
   'SGD', 'THB', 'TRY', 'USD', 'ZAR'];
- 
+
 // Words and symbols people use for each currency
 const CURRENCY_WORDS = {
   '£': 'GBP', pound: 'GBP', pounds: 'GBP', gbp: 'GBP', quid: 'GBP', sterling: 'GBP',
@@ -198,7 +218,7 @@ const CURRENCY_WORDS = {
   won: 'KRW', krw: 'KRW', baht: 'THB', thb: 'THB', rand: 'ZAR', zar: 'ZAR',
   aud: 'AUD', cad: 'CAD', sgd: 'SGD', hkd: 'HKD', nzd: 'NZD', sek: 'SEK', nok: 'NOK', dkk: 'DKK',
 };
- 
+
 function toCode(token) {
   if (!token) return null;
   const word = token.toLowerCase();
@@ -207,9 +227,9 @@ function toCode(token) {
   if (token === token.toUpperCase() && SUPPORTED.includes(token)) return token;
   return null;
 }
- 
+
 const toNum = (s) => parseFloat(String(s).replace(/,/g, ''));
- 
+
 // Finds amounts like "£300", "250 euros" or "EUR 40"
 function findAmounts(text) {
   const found = [];
@@ -226,7 +246,7 @@ function findAmounts(text) {
   }
   return found.sort((a, b) => a.index - b.index);
 }
- 
+
 // Finds the currency to convert into: "in pounds", "to USD", "into euros"
 function findTarget(text) {
   for (const m of text.matchAll(/\b(?:in|into|to)\s+([A-Za-zł£€$¥₹₺]+)/gi)) {
@@ -235,23 +255,32 @@ function findTarget(text) {
   }
   return null;
 }
- 
+
 // Finds an exchange rate someone was offered, e.g. "1.02 euros per pound"
 function parseRateOffer(text) {
   let offeredRate = null, from = null, to = null, matched = '';
- 
+
   // "1.02 euros per pound", "1.02 EUR for each GBP"
   for (const m of text.matchAll(/(\d+(?:\.\d+)?)\s*([A-Za-z€$£¥₹₺]+)\s*(?:per|for each|for every|for one|for a|for 1|to the|to a|to 1|=)\s*(?:1\s*)?([A-Za-z€$£¥₹₺]+)/gi)) {
     const t = toCode(m[2]), f = toCode(m[3]);
     if (t && f && t !== f) { offeredRate = toNum(m[1]); to = t; from = f; matched = m[0]; break; }
   }
- 
+
   // "£1 = €1.05" or "1 GBP = 1.05 EUR"
   if (!offeredRate) {
     const m = text.match(/([£€$¥₹₺]|[A-Z]{3})\s?1\s*=\s*([£€$¥₹₺]|[A-Z]{3})?\s?(\d+(?:\.\d+)?)\s*([A-Z]{3})?/);
     if (m) { from = toCode(m[1]); to = toCode(m[2] || m[4]); offeredRate = toNum(m[3]); matched = m[0]; }
   }
- 
+
+  // "1 pound = 0.98 euro", "1 GBP = 1.10 EUR", "1 pound gets you 1.05 euros"
+  if (!offeredRate) {
+    const m = text.match(/\b1\s*([A-Za-z€$£¥₹₺]+)\s*(?:=|is|gets?(?: you)?|buys?)\s*([€$£¥₹₺])?\s?(\d+(?:\.\d+)?)\s*([A-Za-z]+)?/i);
+    if (m) {
+      const f = toCode(m[1]), t = toCode(m[2] || m[4]);
+      if (f && t && f !== t) { from = f; to = t; offeredRate = toNum(m[3]); matched = m[0]; }
+    }
+  }
+
   // "rate of 1.05" + "£300 to euros"
   if (!offeredRate) {
     const m = text.match(/rate\s*(?:of|is|:)?\s*(\d+(?:\.\d+)?)/i);
@@ -260,9 +289,9 @@ function parseRateOffer(text) {
       offeredRate = toNum(m[1]); from = amounts[0].currency; to = findTarget(text); matched = m[0];
     }
   }
- 
+
   if (!offeredRate || !from || !to || from === to) return null;
- 
+
   let rest = text.replace(matched, ' ');
   const fee = parseFee(rest);
   // Remove the fee so it isn't mistaken for the amount
@@ -273,18 +302,18 @@ function parseRateOffer(text) {
   let amount = 100;
   if (inFrom) amount = inFrom.value;
   else if (inTo) amount = inTo.value / offeredRate;
- 
+
   return { type: 'rate_check', amount, from, to, offeredRate, fee };
 }
- 
+
 function parseFee(text) {
   const m = text.match(/(?:fee|commission|charge)\D{0,15}?(\d+(?:\.\d+)?)/i)
     || text.match(/(\d+(?:\.\d+)?)\s*(?:[A-Za-z]+\s)?(?:fee|commission)/i);
   return m ? toNum(m[1]) : 0;
 }
- 
+
 // ---------- Scam warning signs ----------
- 
+
 const SCAM_RULES = [
   { re: /urgent|immediately|right now|today only|within \d* ?hours?|asap|last chance/i,
     reason: "Pressure to pay quickly. Scammers rush you so you don't stop to check." },
@@ -307,7 +336,7 @@ const SCAM_RULES = [
   { re: /(mum|mom|dad).{0,40}new (phone|number)|new (phone|number).{0,40}(mum|mom|dad)/i,
     reason: '"New number" family message. A common impersonation scam.' },
 ];
- 
+
 // ---------- Live exchange rates ----------
 // 1. Wise's rate, through our server (if it has a Wise token)
 // 2. Otherwise, the European Central Bank rate from Frankfurter
@@ -316,7 +345,7 @@ async function getRate(from, to) {
   if (!SUPPORTED.includes(from) || !SUPPORTED.includes(to)) {
     throw new Error(`Unsupported currency: ${from} or ${to}`);
   }
- 
+
   try {
     const res = await fetch(`/api/rate?from=${from}&to=${to}`);
     if (res.ok) {
@@ -326,28 +355,28 @@ async function getRate(from, to) {
   } catch (e) {
     // No server
   }
- 
+
   const res = await fetch(`https://api.frankfurter.app/latest?from=${from}&to=${to}`);
   if (!res.ok) throw new Error('Could not load the exchange rate');
   const data = await res.json();
   return { rate: data.rates[to], date: data.date, source: 'the European Central Bank' };
 }
- 
+
 // =====================================================================
 //  Result cards
 // =====================================================================
- 
+
 // The AI may say green/amber/red; the page uses safe/caution/danger
 function normaliseVerdict(v) {
   return { green: 'safe', amber: 'caution', red: 'danger' }[v] || (['safe', 'caution', 'danger'].includes(v) ? v : 'caution');
 }
- 
+
 const VERDICT_ICON = { safe: 'i-safe', caution: 'i-caution', danger: 'i-danger' };
- 
+
 function verdictBadge(verdict, label) {
   return `<span class="verdict ${verdict}"><svg aria-hidden="true"><use href="#${VERDICT_ICON[verdict]}"/></svg>${label}</span>`;
 }
- 
+
 async function renderResult(result) {
   switch (result.type) {
     case 'convert': return renderConvert(result);
@@ -356,17 +385,17 @@ async function renderResult(result) {
     default: return messageCard(result.text || "I couldn't understand that. Try including an amount, like €250.");
   }
 }
- 
+
 function wiseLink(from, to, amount) {
   const url = `https://wise.com/gb/currency-converter/${from.toLowerCase()}-to-${to.toLowerCase()}-rate?amount=${Math.round(amount * 100) / 100}`;
   return `<a class="card-link" href="${url}" target="_blank" rel="noopener">See this conversion on Wise</a>`;
 }
- 
+
 // ---------- Convert ----------
 async function renderConvert({ amount, from, to }) {
   const { rate, date, source } = await getRate(from, to);
   const converted = amount * rate;
- 
+
   return `
     <div class="card">
       <div class="convert-visual" aria-hidden="true">
@@ -385,11 +414,11 @@ async function renderConvert({ amount, from, to }) {
       <div class="meta">Mid-market rate from ${source}, ${formatDate(date)}</div>
     </div>`;
 }
- 
+
 // ---------- Rate check ----------
 async function renderRate({ amount, from, to, offeredRate, fee = 0 }) {
   const { rate: realRate, date, source } = await getRate(from, to);
- 
+
   // If the rate looks upside down (e.g. 0.87 instead of 1.15), flip it
   let note = '';
   const ratio = offeredRate / realRate;
@@ -397,13 +426,13 @@ async function renderRate({ amount, from, to, offeredRate, fee = 0 }) {
     offeredRate = 1 / offeredRate;
     note = '<p class="note-small">The rate you entered looked upside down, so it has been flipped.</p>';
   }
- 
+
   const shouldGet = amount * realRate;
   const willGet = Math.max(0, amount - (fee || 0)) * offeredRate;
   const lossInTo = Math.max(0, shouldGet - willGet);
   const lossInFrom = lossInTo / realRate;
   const percent = (lossInTo / shouldGet) * 100;
- 
+
   const verdict = percent < 1 ? 'safe' : percent < 3 ? 'caution' : 'danger';
   const labels = { safe: 'Fair rate', caution: 'Check first: pricey', danger: 'Stop: rip-off rate' };
   const advice = {
@@ -411,7 +440,7 @@ async function renderRate({ amount, from, to, offeredRate, fee = 0 }) {
     caution: "You're paying a noticeable markup. Compare with a cheaper provider first.",
     danger: "You're losing a lot here. Avoid this if you can and use a provider that gives the real rate.",
   };
- 
+
   return `
     <div class="card">
       ${verdictBadge(verdict, labels[verdict])}
@@ -435,7 +464,7 @@ async function renderRate({ amount, from, to, offeredRate, fee = 0 }) {
       <div class="meta">Mid-market rate from ${source}, ${formatDate(date)}</div>
     </div>`;
 }
- 
+
 // ---------- Scam check ----------
 function renderScam({ verdict, reasons = [], advice }) {
   verdict = normaliseVerdict(verdict);
@@ -457,7 +486,7 @@ function renderScam({ verdict, reasons = [], advice }) {
     ],
   };
   const steps = advice && advice.length ? advice : defaultAdvice[verdict];
- 
+
   return `
     <div class="card">
       ${verdictBadge(verdict, labels[verdict])}
@@ -470,16 +499,16 @@ function renderScam({ verdict, reasons = [], advice }) {
       <div class="meta">A quick safety check, not a guarantee.</div>
     </div>`;
 }
- 
+
 function formatDate(date) {
   const d = new Date(date);
   return isNaN(d) ? '' : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 }
- 
+
 // =====================================================================
 //  Compare providers
 // =====================================================================
- 
+
 // Example providers. markup = how much worse than the real rate (0.025 = 2.5%)
 // fee = what they charge, in the currency you send
 const EXAMPLE_PROVIDERS = [
@@ -488,31 +517,31 @@ const EXAMPLE_PROVIDERS = [
   { name: 'UK high-street bank', markup: 0.025, fee: () => 10 },
   { name: 'Airport exchange desk', markup: 0.09, fee: () => 0 },
 ];
- 
+
 const compareAmount = document.getElementById('compareAmount');
 const compareTo = document.getElementById('compareTo');
 const compareFromCode = document.getElementById('compareFromCode');
 const compareNote = document.getElementById('compareNote');
 const compareResults = document.getElementById('compareResults');
 let compareTimer = null;
- 
+
 // Fills the "They receive in" list with currency names
 function fillCompareCurrencies() {
   const from = homeSelect.value;
   const previous = compareTo.value;
   let names = null;
   try { names = new Intl.DisplayNames(['en'], { type: 'currency' }); } catch { /* older browsers */ }
- 
+
   compareTo.innerHTML = SUPPORTED
     .filter((code) => code !== from)
     .map((code) => `<option value="${code}">${code}${names ? `, ${names.of(code)}` : ''}</option>`)
     .join('');
- 
+
   const fallback = from === 'EUR' ? 'GBP' : 'EUR';
   compareTo.value = previous && previous !== from ? previous : fallback;
   compareFromCode.textContent = from;
 }
- 
+
 // Gets each provider's result: Wise's real data if the backend has it, otherwise examples
 async function getProviderQuotes(from, to, amount) {
   try {
@@ -524,7 +553,7 @@ async function getProviderQuotes(from, to, amount) {
   } catch (e) {
     // No backend yet
   }
- 
+
   const { rate } = await getRate(from, to);
   const providers = EXAMPLE_PROVIDERS.map((p) => {
     const fee = p.fee(amount);
@@ -533,27 +562,27 @@ async function getProviderQuotes(from, to, amount) {
   });
   return { providers, live: false };
 }
- 
+
 async function updateCompare() {
   const from = homeSelect.value;
   const to = compareTo.value;
   const amount = parseFloat(compareAmount.value);
- 
+
   if (!amount || amount <= 0) {
     compareResults.innerHTML = '<p class="sub">Enter an amount above 0 to compare.</p>';
     return;
   }
- 
+
   try {
     const { providers, live } = await getProviderQuotes(from, to, amount);
     providers.sort((a, b) => b.received - a.received);
     const best = providers[0].received;
     const worst = providers[providers.length - 1].received;
- 
+
     compareNote.textContent = live
       ? "Live prices from Wise's comparison data."
       : "Example fees, using today's real mid-market rate. Change the amount or currency to try it.";
- 
+
     compareResults.innerHTML = `
       <ul class="providers">
         ${providers.map((p, i) => `
@@ -576,13 +605,13 @@ async function updateCompare() {
     compareResults.innerHTML = "<p class=\"sub\">Couldn't load today's rate. Check your internet connection and try again.</p>";
   }
 }
- 
+
 // Wait until the user stops typing before updating
 function scheduleCompare() {
   clearTimeout(compareTimer);
   compareTimer = setTimeout(updateCompare, 300);
 }
- 
+
 compareAmount.addEventListener('input', scheduleCompare);
 compareTo.addEventListener('change', updateCompare);
 document.getElementById('compareForm').addEventListener('submit', (e) => e.preventDefault());
@@ -590,15 +619,15 @@ homeSelect.addEventListener('change', () => {
   fillCompareCurrencies();
   updateCompare();
 });
- 
+
 // =====================================================================
 //  3. Helpers
 // =====================================================================
- 
+
 function messageCard(text) {
   return `<div class="card"><p class="text">${escapeHtml(text)}</p></div>`;
 }
- 
+
 function addUserMessage(text, image) {
   const div = document.createElement('div');
   div.className = 'msg user';
@@ -606,12 +635,12 @@ function addUserMessage(text, image) {
   chat.appendChild(div);
   scrollDown();
 }
- 
+
 function addBotCard(html) {
   const div = document.createElement('div');
   div.className = 'msg bot';
   div.innerHTML = html;
- 
+
   // Every result gets a "Read aloud" button
   const card = div.querySelector('.card');
   if (card && 'speechSynthesis' in window) {
@@ -622,12 +651,12 @@ function addBotCard(html) {
     btn.addEventListener('click', () => speak(cardText(card)));
     card.appendChild(btn);
   }
- 
+
   chat.appendChild(div);
   scrollDown();
   if (settings.readAloud && card) speak(cardText(card));
 }
- 
+
 function addLoading() {
   const div = document.createElement('div');
   div.className = 'msg bot';
@@ -636,18 +665,18 @@ function addLoading() {
   scrollDown();
   return div;
 }
- 
+
 function scrollDown() {
   chat.scrollTop = chat.scrollHeight;
 }
- 
+
 // The text of a card, without the button labels
 function cardText(card) {
   const copy = card.cloneNode(true);
   copy.querySelectorAll('button').forEach((b) => b.remove());
   return copy.innerText.replace(/\s+/g, ' ').trim();
 }
- 
+
 function speak(text) {
   if (!('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
@@ -655,7 +684,7 @@ function speak(text) {
   utterance.lang = 'en-GB';
   window.speechSynthesis.speak(utterance);
 }
- 
+
 function money(value, currency) {
   try {
     return new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format(value);
@@ -663,7 +692,7 @@ function money(value, currency) {
     return `${value.toFixed(2)} ${currency}`;
   }
 }
- 
+
 function escapeHtml(str) {
   return String(str)
     .replace(/&/g, '&amp;')
@@ -671,11 +700,11 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 }
- 
+
 // =====================================================================
 //  4. Accessibility settings (saved in the browser)
 // =====================================================================
- 
+
 const root = document.documentElement;
 const panel = document.getElementById('accessPanel');
 const DEFAULTS = {
@@ -688,24 +717,24 @@ const DEFAULTS = {
   readAloud: false,
 };
 let settings = loadSettings();
- 
+
 function loadSettings() {
   try {
-    const saved = JSON.parse(localStorage.getItem('paycheck-access') || '{}');
+    const saved = JSON.parse(localStorage.getItem('payprooof-access') || '{}');
     return { ...DEFAULTS, ...saved };
   } catch {
     return { ...DEFAULTS };
   }
 }
- 
+
 function saveSettings() {
   try {
-    localStorage.setItem('paycheck-access', JSON.stringify(settings));
+    localStorage.setItem('paypro0of-access', JSON.stringify(settings));
   } catch {
     // Saving isn't possible (e.g. private browsing). Settings still work for this visit.
   }
 }
- 
+
 // Turns settings into data-... attributes on <html>, which style.css reacts to
 function applySettings() {
   root.style.setProperty('--scale', settings.textSize);
@@ -722,7 +751,7 @@ function applySettings() {
   });
   updateScrollEffect();
 }
- 
+
 panel.querySelectorAll('[data-setting]').forEach((box) => {
   box.addEventListener('change', () => {
     settings[box.dataset.setting] = box.checked;
@@ -731,7 +760,7 @@ panel.querySelectorAll('[data-setting]').forEach((box) => {
     saveSettings();
   });
 });
- 
+
 panel.querySelectorAll('input[name="textSize"]').forEach((radio) => {
   radio.addEventListener('change', () => {
     settings.textSize = radio.value;
@@ -739,24 +768,24 @@ panel.querySelectorAll('input[name="textSize"]').forEach((radio) => {
     saveSettings();
   });
 });
- 
+
 document.getElementById('resetAccess').addEventListener('click', () => {
   settings = { ...DEFAULTS };
   applySettings();
   saveSettings();
 });
- 
+
 document.getElementById('accessBtn').addEventListener('click', () => panel.showModal());
 document.getElementById('closeAccess').addEventListener('click', () => panel.close());
 // Clicking the dark area outside the panel closes it
 panel.addEventListener('click', (e) => {
   if (e.target === panel) panel.close();
 });
- 
+
 // =====================================================================
 //  5. Visual effects
 // =====================================================================
- 
+
 // ---------- Banknote pattern (fine swirling lines, like security printing) ----------
 function drawNotePattern() {
   const svg = document.getElementById('notePattern');
@@ -768,7 +797,7 @@ function drawNotePattern() {
     el.style.fill = 'none';
     svg.appendChild(el);
   };
- 
+
   // Wavy lines across the note
   for (let row = 0; row < 16; row++) {
     let d = `M -10 ${row * 16}`;
@@ -777,7 +806,7 @@ function drawNotePattern() {
     }
     add('path', { d, 'stroke-width': 0.5, opacity: 0.35 });
   }
- 
+
   // Two rosettes made of rotated ellipses
   for (let i = 0; i < 36; i++) {
     add('ellipse', { cx: 300, cy: 100, rx: 88, ry: 30, transform: `rotate(${i * 5} 300 100)`, 'stroke-width': 0.6, opacity: 0.55 });
@@ -786,13 +815,13 @@ function drawNotePattern() {
     add('ellipse', { cx: 300, cy: 100, rx: 44, ry: 14, transform: `rotate(${i * 7.5} 300 100)`, 'stroke-width': 0.6, opacity: 0.9, colour: 'var(--accent)' });
   }
 }
- 
+
 // ---------- Magnifying lens that follows the mouse ----------
 function setUpLens() {
   const note = document.getElementById('note');
   const micro = note.querySelector('.note-micro');
   micro.textContent = 'GENUINE MID-MARKET RATE '.repeat(140);
- 
+
   note.addEventListener('pointermove', (e) => {
     if (e.pointerType === 'touch') return;
     const box = note.getBoundingClientRect();
@@ -802,12 +831,12 @@ function setUpLens() {
   });
   note.addEventListener('pointerleave', () => note.classList.remove('is-checking'));
 }
- 
+
 // ---------- Coin that moves down "How it works" as you scroll ----------
 const stepsList = document.getElementById('steps');
 const stepItems = stepsList.querySelectorAll('.step');
 let scrollTicking = false;
- 
+
 function updateScrollEffect() {
   scrollTicking = false;
   if (settings.reduceMotion) {
@@ -819,13 +848,13 @@ function updateScrollEffect() {
   const box = stepsList.getBoundingClientRect();
   const progress = Math.min(1, Math.max(0, (middle - box.top) / box.height));
   stepsList.style.setProperty('--p', progress.toFixed(3));
- 
+
   stepItems.forEach((step) => {
     const r = step.getBoundingClientRect();
     step.classList.toggle('is-reached', r.top + r.height / 2 < middle);
   });
 }
- 
+
 window.addEventListener('scroll', () => {
   if (!scrollTicking) {
     scrollTicking = true;
@@ -833,11 +862,10 @@ window.addEventListener('scroll', () => {
   }
 }, { passive: true });
 window.addEventListener('resize', updateScrollEffect);
- 
+
 // ---------- Start everything ----------
 drawNotePattern();
 setUpLens();
 applySettings();
 fillCompareCurrencies();
 updateCompare();
- 

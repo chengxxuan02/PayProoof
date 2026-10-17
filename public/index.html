@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PayCheck</title>
+  <title>PayProoof</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Lexend:wght@400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
- 
+
   <!-- ===== Icons (drawn once, reused everywhere with <use>) ===== -->
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
     <symbol id="i-logo" viewBox="0 0 32 32"><rect x="2" y="6" width="28" height="20" rx="4" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M10 16.5l4 4 8-9" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
@@ -27,14 +27,14 @@
     <symbol id="i-caution" viewBox="0 0 24 24"><path d="M12 2.5L22.5 21h-21z" fill="currentColor"/><path d="M12 9v5" stroke="#1a1a1a" stroke-width="2.6" stroke-linecap="round"/><circle cx="12" cy="17.5" r="1.5" fill="#1a1a1a"/></symbol>
     <symbol id="i-danger" viewBox="0 0 24 24"><path d="M8 2h8l6 6v8l-6 6H8l-6-6V8z" fill="currentColor"/><path d="M8.5 8.5l7 7M15.5 8.5l-7 7" style="stroke: var(--icon-inner, #fff)" stroke-width="2.6" stroke-linecap="round"/></symbol>
   </svg>
- 
+
   <a class="skip-link" href="#checker">Skip to the checker</a>
- 
+
   <!-- ===== Header ===== -->
   <header class="site-header">
-    <a class="logo" href="#top" aria-label="PayCheck home">
+    <a class="logo" href="#top" aria-label="PayProoof home">
       <svg class="logo-mark" aria-hidden="true"><use href="#i-logo"/></svg>
-      <span>PayCheck</span>
+      <span>PayProoof</span>
     </a>
     <nav class="site-nav" aria-label="Main">
       <a href="#how">How it works</a>
@@ -47,20 +47,21 @@
       <span>Accessibility</span>
     </button>
   </header>
- 
+
   <main id="top">
- 
+
     <!-- ===== Hero ===== -->
+    <div class="band band-dark">
     <section class="hero">
       <div class="hero-copy">
         <h1>Know what a payment really costs before you make it.</h1>
-        <p class="lede">Paste a message, type an amount or snap a photo of a price. PayCheck converts it at the real rate, shows hidden exchange fees and spots the signs of a scam.</p>
+        <p class="lede">Paste a message, type an amount or snap a photo of a price. PayProoof converts it at the real rate, shows hidden exchange fees and spots the signs of a scam.</p>
         <div class="hero-actions">
           <a href="#checker" class="btn btn-primary">Start a check</a>
           <a href="#how" class="btn btn-quiet">See how it works</a>
         </div>
       </div>
- 
+
       <!-- The banknote: move your mouse over it to check it's genuine -->
       <figure class="note" id="note" aria-label="Illustration of a banknote being checked with a magnifying lens">
         <svg class="note-pattern" id="notePattern" viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" aria-hidden="true"></svg>
@@ -76,13 +77,15 @@
         <figcaption class="note-hint">Move over the note to check it</figcaption>
       </figure>
     </section>
- 
+    </div>
+
     <!-- ===== How it works (the coin moves down as you scroll) ===== -->
+    <div class="band band-bright">
     <section class="how" id="how" aria-labelledby="how-title">
       <h2 id="how-title">How it works</h2>
       <ol class="steps" id="steps">
         <li class="track" aria-hidden="true"><span class="track-fill" id="trackFill"></span><span class="coin" id="coin">£</span></li>
- 
+
         <li class="step">
           <svg class="step-art" viewBox="0 0 160 120" aria-hidden="true">
             <rect x="48" y="8" width="64" height="104" rx="10" fill="var(--paper)" stroke="var(--deep)" stroke-width="3"/>
@@ -97,7 +100,7 @@
             <p>Type an amount, paste a payment request, or take a photo of a price, a bill or an exchange-rate board.</p>
           </div>
         </li>
- 
+
         <li class="step">
           <svg class="step-art" viewBox="0 0 160 120" aria-hidden="true">
             <rect x="20" y="30" width="96" height="16" rx="8" fill="var(--line)"/>
@@ -111,7 +114,7 @@
             <p>It looks up today's mid-market exchange rate, works out the hidden markup, and looks for common scam warning signs.</p>
           </div>
         </li>
- 
+
         <li class="step">
           <svg class="step-art" viewBox="0 0 160 120" aria-hidden="true">
             <g transform="translate(14 38)"><circle cx="20" cy="20" r="20" fill="var(--safe)"/><path d="M10 21l7 7 13-14" fill="none" stroke="#fff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/></g>
@@ -125,8 +128,10 @@
         </li>
       </ol>
     </section>
- 
+    </div>
+
     <!-- ===== The checker ===== -->
+    <div class="band band-soft">
     <section class="checker" id="checker" aria-labelledby="checker-title">
       <div class="checker-head">
         <h2 id="checker-title">Check a payment</h2>
@@ -146,7 +151,7 @@
           </select>
         </label>
       </div>
- 
+
       <div class="modes" role="radiogroup" aria-label="What do you want to check?">
         <button type="button" class="mode active" data-mode="auto" role="radio" aria-checked="true">
           <svg aria-hidden="true"><use href="#i-auto"/></svg> Work it out for me
@@ -161,7 +166,7 @@
           <svg aria-hidden="true"><use href="#i-shield"/></svg> Scam check
         </button>
       </div>
- 
+
       <div id="chat" class="chat" role="log" aria-live="polite" aria-label="Your checks">
         <div id="welcome" class="welcome">
           <p>Try one of these, or type your own below.</p>
@@ -181,14 +186,14 @@
           </div>
         </div>
       </div>
- 
+
       <div id="imagePreview" class="image-preview hidden">
         <img id="previewImg" alt="The photo you attached">
         <button type="button" id="removeImage" aria-label="Remove photo">
           <svg aria-hidden="true"><use href="#i-close"/></svg>
         </button>
       </div>
- 
+
       <form id="composer" class="composer">
         <label class="upload-btn" title="Add a photo">
           <svg aria-hidden="true"><use href="#i-camera"/></svg>
@@ -200,8 +205,10 @@
         <button type="submit" class="btn btn-primary send-btn">Check</button>
       </form>
     </section>
- 
+    </div>
+
     <!-- ===== Compare providers ===== -->
+    <div class="band band-dark">
     <section class="compare" id="compare" aria-labelledby="compare-title">
       <h2 id="compare-title">Compare before you send</h2>
       <p class="compare-intro">See how much the person you're paying would actually receive with different providers.</p>
@@ -220,8 +227,10 @@
         <div id="compareResults" aria-live="polite"></div>
       </div>
     </section>
- 
+    </div>
+
     <!-- ===== Verdict key (for visual learners and colour-blind users) ===== -->
+    <div class="band band-light">
     <section class="key" id="key" aria-labelledby="key-title">
       <h2 id="key-title">Reading a result</h2>
       <p class="key-intro">Each answer uses a different shape and pattern, so you never have to rely on colour alone.</p>
@@ -240,12 +249,13 @@
         </li>
       </ul>
     </section>
+    </div>
   </main>
- 
+
   <footer class="site-footer">
-    <p>PayCheck is a quick safety check, not financial advice. Rates are mid-market rates from the European Central Bank.</p>
+    <p>PayProoof is a quick safety check, not financial advice. Rates are mid-market rates from the European Central Bank.</p>
   </footer>
- 
+
   <!-- ===== Accessibility settings ===== -->
   <dialog id="accessPanel" class="access-panel" aria-labelledby="access-title">
     <div class="panel-head">
@@ -254,7 +264,7 @@
         <svg aria-hidden="true"><use href="#i-close"/></svg>
       </button>
     </div>
- 
+
     <fieldset class="setting">
       <legend>Text size</legend>
       <div class="segmented">
@@ -263,18 +273,19 @@
         <label><input type="radio" name="textSize" value="1.3"> <span>Extra large</span></label>
       </div>
     </fieldset>
- 
+
     <label class="toggle"><input type="checkbox" data-setting="easyFont"> <span>Easy-read font</span></label>
     <label class="toggle"><input type="checkbox" data-setting="spacing"> <span>More space between lines and letters</span></label>
     <label class="toggle"><input type="checkbox" data-setting="contrast"> <span>High contrast</span></label>
     <label class="toggle"><input type="checkbox" data-setting="cbPalette"> <span>Colour-blind theme (blue and orange)</span></label>
     <label class="toggle"><input type="checkbox" data-setting="reduceMotion"> <span>Reduce motion</span></label>
     <label class="toggle"><input type="checkbox" data-setting="readAloud"> <span>Read results aloud</span></label>
- 
+
     <button type="button" class="btn btn-quiet reset-btn" id="resetAccess">Reset to default</button>
   </dialog>
- 
+
+  <!-- Free photo reader (no key needed) -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
-
