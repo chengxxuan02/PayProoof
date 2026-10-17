@@ -1,5 +1,5 @@
 // =====================================================================
-//  payprooof - frontend logic
+//  PayProoof - frontend logic
 //
 //  Sections in this file:
 //   1. The checker (mode buttons, examples, photos, sending messages)
@@ -109,6 +109,7 @@ form.addEventListener('submit', async (event) => {
   const loading = addLoading();
   try {
     const result = await analyse(text, image);
+    result.userText = text;
     const html = await renderResult(result);
     loading.remove();
     addBotCard(html);
@@ -464,12 +465,13 @@ async function renderRate({ amount, from, to, offeredRate, fee = 0 }) {
       </div>
       ${note}
       ${verdict !== 'safe' ? wiseLink(from, to, amount) : ''}
+      ${trustButton(`Hi, can you give me a second opinion before I pay? I'm about to change ${money(amount, from)} at a rate of 1 ${from} = ${offeredRate.toFixed(4)} ${to}${fee ? ` with a ${money(fee, from)} fee` : ''}. PayProoof says it's ${{ safe: 'a fair rate', caution: 'a pricey rate', danger: 'a rip-off rate' }[verdict]}: I'd get ${money(willGet, to)} instead of ${money(shouldGet, to)} at the real rate, so I'd lose about ${money(lossInFrom, from)}, which is ${percent.toFixed(1)}% of my money. Should I go ahead?`)}
       <div class="meta">Mid-market rate from ${source}, ${formatDate(date)}</div>
     </div>`;
 }
 
 // ---------- Scam check ----------
-function renderScam({ verdict, reasons = [], advice }) {
+function renderScam({ verdict, reasons = [], advice, userText = '' }) {
   verdict = normaliseVerdict(verdict);
   const labels = { safe: 'Looks fine', caution: 'Check first', danger: "Stop: don't send this money" };
   const defaultAdvice = {
@@ -499,9 +501,75 @@ function renderScam({ verdict, reasons = [], advice }) {
         : '<p class="sub">None of the common warning signs were found.</p>'}
       <h3>What to do</h3>
       <ul>${steps.map((s) => `<li>${escapeHtml(s)}</li>`).join('')}</ul>
+      ${trustButton(scamShareText(verdict, labels[verdict], reasons, userText))}
       <div class="meta">A quick safety check, not a guarantee.</div>
     </div>`;
 }
+
+// =====================================================================
+//  Ask someone you trust
+// =====================================================================
+
+function trustButton(message) {
+  return `<button type="button" class="trust-btn" data-share="${escapeHtml(message)}">
+    <svg aria-hidden="true"><use href="#i-people"/></svg>Ask someone you trust</button>`;
+}
+
+function scamShareText(verdict, label, reasons, userText) {
+  const quoted = userText ? `\n\nThe message says:\n"${userText.length > 400 ? `${userText.slice(0, 400)}…` : userText}"` : '';
+  const signs = reasons.length ? `\n\nWarning signs it found:\n${reasons.map((r) => `- ${r}`).join('\n')}` : '';
+  return `Hi, can you give me a second opinion before I pay anything? PayProoof says: ${label}.${signs}${quoted}\n\nWhat do you think I should do?`;
+}
+
+const trustPanel = document.getElementById('trustPanel');
+const trustMessage = document.getElementById('trustMessage');
+const trustStatus = document.getElementById('trustStatus');
+const trustShareBtn = document.getElementById('trustShare');
+
+// Keeps the WhatsApp, text and email links matching the message
+function updateTrustLinks() {
+  const text = trustMessage.value;
+  const encoded = encodeURIComponent(text);
+  document.getElementById('trustWhatsApp').href = `https://wa.me/?text=${encoded}`;
+  document.getElementById('trustSms').href = `sms:?&body=${encoded}`;
+  document.getElementById('trustEmail').href = `mailto:?subject=${encodeURIComponent('Can you check this before I pay?')}&body=${encoded}`;
+}
+
+function openTrust(message) {
+  trustMessage.value = message;
+  trustStatus.textContent = '';
+  updateTrustLinks();
+  trustShareBtn.classList.toggle('hidden', !navigator.share);
+  trustPanel.showModal();
+}
+
+chat.addEventListener('click', (e) => {
+  const btn = e.target.closest('.trust-btn');
+  if (btn) openTrust(btn.dataset.share);
+});
+trustMessage.addEventListener('input', updateTrustLinks);
+document.getElementById('closeTrust').addEventListener('click', () => trustPanel.close());
+trustPanel.addEventListener('click', (e) => {
+  if (e.target === trustPanel) trustPanel.close();
+});
+
+document.getElementById('trustCopy').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(trustMessage.value);
+    trustStatus.textContent = 'Copied. Paste it into any app to send it.';
+  } catch {
+    trustMessage.select();
+    trustStatus.textContent = 'Press Ctrl+C (or long-press and Copy) to copy the message.';
+  }
+});
+
+trustShareBtn.addEventListener('click', async () => {
+  try {
+    await navigator.share({ title: 'Can you check this before I pay?', text: trustMessage.value });
+  } catch {
+    // The person closed the share menu
+  }
+});
 
 function formatDate(date) {
   const d = new Date(date);
@@ -509,24 +577,19 @@ function formatDate(date) {
 }
 
 // =====================================================================
-//  Compare providers
+//  Compare offers
+//  Every number here is either the live real rate or something the user typed.
 // =====================================================================
-
-// Example providers. markup = how much worse than the real rate (0.025 = 2.5%)
-// fee = what they charge, in the currency you send
-const EXAMPLE_PROVIDERS = [
-  { name: 'Wise', markup: 0, fee: (amount) => Math.max(1, amount * 0.0045) },
-  { name: 'Overseas bank', markup: 0.015, fee: () => 15 },
-  { name: 'UK high-street bank', markup: 0.025, fee: () => 10 },
-  { name: 'Airport exchange desk', markup: 0.09, fee: () => 0 },
-];
 
 const compareAmount = document.getElementById('compareAmount');
 const compareTo = document.getElementById('compareTo');
 const compareFromCode = document.getElementById('compareFromCode');
-const compareNote = document.getElementById('compareNote');
+const realRateBox = document.getElementById('realRate');
+const offersBox = document.getElementById('offers');
 const compareResults = document.getElementById('compareResults');
+const wiseCompareLink = document.getElementById('wiseCompareLink');
 let compareTimer = null;
+let offerCount = 0;
 
 // Fills the "They receive in" list with currency names
 function fillCompareCurrencies() {
@@ -543,85 +606,150 @@ function fillCompareCurrencies() {
   const fallback = from === 'EUR' ? 'GBP' : 'EUR';
   compareTo.value = previous && previous !== from ? previous : fallback;
   compareFromCode.textContent = from;
+  updateOfferLabels();
 }
 
-// Gets each provider's result: Wise's real data if the backend has it, otherwise examples
-async function getProviderQuotes(from, to, amount) {
-  try {
-    const res = await fetch(`/api/compare?from=${from}&to=${to}&amount=${amount}`);
-    if (res.ok) {
-      const data = await res.json();
-      if (data.providers && data.providers.length) return { providers: data.providers, live: true };
-    }
-  } catch (e) {
-    // No backend yet
-  }
-
-  const { rate } = await getRate(from, to);
-  const providers = EXAMPLE_PROVIDERS.map((p) => {
-    const fee = p.fee(amount);
-    const theirRate = rate * (1 - p.markup);
-    return { name: p.name, rate: theirRate, fee, received: Math.max(0, amount - fee) * theirRate };
+// Adds a row where the user types one offer
+function addOffer(name = '') {
+  offerCount += 1;
+  const id = offerCount;
+  const row = document.createElement('div');
+  row.className = 'offer';
+  row.innerHTML = `
+    <label class="field">
+      <span>Provider</span>
+      <input type="text" class="offer-name" value="${escapeHtml(name)}" placeholder="For example: my bank" autocomplete="off">
+    </label>
+    <label class="field">
+      <span class="rate-label">Their rate</span>
+      <input type="number" class="offer-rate" min="0" step="any" inputmode="decimal" placeholder="0.00">
+    </label>
+    <label class="field">
+      <span class="fee-label">Their fee</span>
+      <input type="number" class="offer-fee" min="0" step="any" inputmode="decimal" placeholder="0">
+    </label>
+    <button type="button" class="icon-btn offer-remove" aria-label="Remove this offer">
+      <svg aria-hidden="true"><use href="#i-close"/></svg>
+    </button>`;
+  row.querySelectorAll('input').forEach((el) => el.addEventListener('input', scheduleCompare));
+  row.querySelector('.offer-remove').addEventListener('click', () => {
+    row.remove();
+    updateCompare();
   });
-  return { providers, live: false };
+  offersBox.appendChild(row);
+  updateOfferLabels();
+  return row;
+}
+
+// Shows the right currencies in each row's labels, e.g. "Their rate (1 GBP = ? EUR)"
+function updateOfferLabels() {
+  const from = homeSelect.value;
+  const to = compareTo.value;
+  offersBox.querySelectorAll('.rate-label').forEach((el) => { el.textContent = `Their rate: 1 ${from} = how many ${to}`; });
+  offersBox.querySelectorAll('.fee-label').forEach((el) => { el.textContent = `Their fee in ${from}`; });
 }
 
 async function updateCompare() {
   const from = homeSelect.value;
   const to = compareTo.value;
   const amount = parseFloat(compareAmount.value);
+  wiseCompareLink.href = `https://wise.com/gb/currency-converter/${from.toLowerCase()}-to-${to.toLowerCase()}-rate?amount=${amount || 1000}`;
 
   if (!amount || amount <= 0) {
+    realRateBox.innerHTML = '';
     compareResults.innerHTML = '<p class="sub">Enter an amount above 0 to compare.</p>';
     return;
   }
 
+  let real;
   try {
-    const { providers, live } = await getProviderQuotes(from, to, amount);
-    providers.sort((a, b) => b.received - a.received);
-    const best = providers[0].received;
-    const worst = providers[providers.length - 1].received;
-
-    compareNote.textContent = live
-      ? "Live prices from Wise's comparison data."
-      : "Example fees, using today's real mid-market rate. Change the amount or currency to try it.";
-
-    compareResults.innerHTML = `
-      <ul class="providers">
-        ${providers.map((p, i) => `
-          <li class="provider ${i === 0 ? 'best' : ''}">
-            <div>
-              <div class="provider-name">${escapeHtml(p.name)}</div>
-              ${i === 0 ? '<span class="provider-badge"><svg aria-hidden="true"><use href="#i-safe"/></svg>Most received</span>' : ''}
-            </div>
-            <div class="provider-rate">Rate ${p.rate.toFixed(4)}<br>Fee ${money(p.fee, from)}</div>
-            <div class="provider-gets">${money(p.received, to)}</div>
-            <div class="provider-bar" aria-hidden="true"><span style="width:${((p.received / best) * 100).toFixed(1)}%"></span></div>
-          </li>`).join('')}
-      </ul>
-      <div class="compare-summary">
-        <strong>${money(best - worst, to)}</strong>
-        <span>difference between the best and worst option</span>
-      </div>`;
+    real = await getRate(from, to);
   } catch (err) {
     console.error(err);
-    compareResults.innerHTML = "<p class=\"sub\">Today's exchange rate didn't load. Wait a moment and change the amount to try again.</p>";
+    realRateBox.innerHTML = "<p class=\"sub\">Today's exchange rate didn't load. Wait a moment and change the amount to try again.</p>";
+    compareResults.innerHTML = '';
+    return;
   }
+
+  const fair = amount * real.rate;
+  realRateBox.innerHTML = `
+    <div class="real-rate-label">At the real rate, with no fees, they would receive</div>
+    <div class="real-rate-amount">${money(fair, to)}</div>
+    <div class="sub">1 ${from} = ${real.rate.toFixed(4)} ${to}. Live mid-market rate from ${real.source}, ${formatDate(real.date)}.</div>`;
+
+  // Read the offers the user has typed
+  const offers = [];
+  offersBox.querySelectorAll('.offer').forEach((row, i) => {
+    let rate = parseFloat(row.querySelector('.offer-rate').value);
+    const fee = parseFloat(row.querySelector('.offer-fee').value) || 0;
+    const name = row.querySelector('.offer-name').value.trim() || `Offer ${i + 1}`;
+    if (!(rate > 0)) return;
+    // If a rate looks upside down (e.g. 0.87 instead of 1.15), flip it
+    let flipped = false;
+    if (Math.abs(rate / real.rate - 1) > 0.5 && Math.abs(1 / rate / real.rate - 1) < 0.5) {
+      rate = 1 / rate;
+      flipped = true;
+    }
+    const received = Math.max(0, amount - fee) * rate;
+    const loss = Math.max(0, fair - received);
+    const percent = (loss / fair) * 100;
+    offers.push({ name, rate, fee, received, loss, percent, flipped });
+  });
+
+  if (!offers.length) {
+    compareResults.innerHTML = '<p class="sub compare-empty">Add the rate and fee you\'ve been offered to see how it compares.</p>';
+    return;
+  }
+
+  offers.sort((a, b) => b.received - a.received);
+  const labels = { safe: 'Fair', caution: 'Pricey', danger: 'Rip-off' };
+
+  compareResults.innerHTML = `
+    <ul class="providers">
+      ${offers.map((o, i) => {
+        const verdict = o.percent < 1 ? 'safe' : o.percent < 3 ? 'caution' : 'danger';
+        return `
+          <li class="provider ${i === 0 && offers.length > 1 ? 'best' : ''}">
+            <div>
+              <div class="provider-name">${escapeHtml(o.name)}</div>
+              ${verdictBadge(verdict, labels[verdict])}
+            </div>
+            <div class="provider-rate">Rate ${o.rate.toFixed(4)}<br>Fee ${money(o.fee, from)}${o.flipped ? '<br>Rate flipped, it looked upside down' : ''}</div>
+            <div class="provider-gets">${money(o.received, to)}<span class="provider-loss">${o.loss > 0 ? `${money(o.loss, to)} less, ${o.percent.toFixed(1)}%` : 'Same as the real rate'}</span></div>
+            <div class="provider-bar" aria-hidden="true"><span style="width:${Math.max(2, (o.received / fair) * 100).toFixed(1)}%"></span></div>
+          </li>`;
+      }).join('')}
+    </ul>
+    ${offers.length > 1 ? `
+      <div class="compare-summary">
+        <strong>${money(offers[0].received - offers[offers.length - 1].received, to)}</strong>
+        <span>more with ${escapeHtml(offers[0].name)} than with ${escapeHtml(offers[offers.length - 1].name)}</span>
+      </div>` : ''}`;
 }
 
 // Wait until the user stops typing before updating
 function scheduleCompare() {
   clearTimeout(compareTimer);
-  compareTimer = setTimeout(updateCompare, 300);
+  compareTimer = setTimeout(updateCompare, 350);
 }
 
 compareAmount.addEventListener('input', scheduleCompare);
-compareTo.addEventListener('change', updateCompare);
+compareTo.addEventListener('change', () => {
+  updateOfferLabels();
+  updateCompare();
+});
 document.getElementById('compareForm').addEventListener('submit', (e) => e.preventDefault());
+document.getElementById('addOffer').addEventListener('click', () => {
+  addOffer().querySelector('.offer-name').focus();
+});
 homeSelect.addEventListener('change', () => {
   fillCompareCurrencies();
   updateCompare();
 });
+
+// Start with two empty offers to fill in
+addOffer();
+addOffer();
 
 // =====================================================================
 //  3. Helpers
@@ -866,9 +994,26 @@ window.addEventListener('scroll', () => {
 }, { passive: true });
 window.addEventListener('resize', updateScrollEffect);
 
+// ---------- Live rate on the banknote ----------
+async function updateNoteRate() {
+  const from = homeSelect.value;
+  const to = from === 'EUR' ? 'GBP' : 'EUR';
+  const amountEl = document.getElementById('noteAmount');
+  const lineEl = document.getElementById('noteLine');
+  amountEl.textContent = money(300, from);
+  try {
+    const { rate } = await getRate(from, to);
+    lineEl.textContent = `Today's real rate: 1 ${from} = ${rate.toFixed(4)} ${to}`;
+  } catch (err) {
+    lineEl.textContent = 'Live rates from Frankfurter';
+  }
+}
+homeSelect.addEventListener('change', updateNoteRate);
+
 // ---------- Start everything ----------
 drawNotePattern();
 setUpLens();
 applySettings();
 fillCompareCurrencies();
 updateCompare();
+updateNoteRate();

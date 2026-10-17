@@ -3,15 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>payprooof</title>
+  <title>PayProoof</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Lexend:wght@400;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
 
-  <!-- ===== Icons  drawn once, reused everywhere with <use>) ===== -->
+  <!-- ===== Icons (drawn once, reused everywhere with <use>) ===== -->
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
     <symbol id="i-logo" viewBox="0 0 32 32"><rect x="2" y="6" width="28" height="20" rx="4" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M10 16.5l4 4 8-9" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-auto" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15.5 8.5l-2 5-5 2 2-5z" fill="currentColor"/></symbol>
@@ -21,6 +21,7 @@
     <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
     <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
     <symbol id="i-access" viewBox="0 0 24 24"><circle cx="12" cy="4.5" r="2" fill="currentColor"/><path d="M5 8.5l7 1.5 7-1.5M12 10v5m0 0l-3 6m3-6l3 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-people" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="17" cy="9" r="2.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 14.2c2.8-.4 5 1.8 5 4.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
     <symbol id="i-sound" viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
     <!-- Verdict shapes: each one is a different shape, not just a different colour -->
     <symbol id="i-safe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="currentColor"/><path d="M7 12.5l3.2 3.2L17 9" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
@@ -32,9 +33,9 @@
 
   <!-- ===== Header ===== -->
   <header class="site-header">
-    <a class="logo" href="#top" aria-label="payprooof home">
+    <a class="logo" href="#top" aria-label="PayProoof home">
       <svg class="logo-mark" aria-hidden="true"><use href="#i-logo"/></svg>
-      <span>payprooof</span>
+      <span>PayProoof</span>
     </a>
     <nav class="site-nav" aria-label="Main">
       <a href="#how">How it works</a>
@@ -54,8 +55,8 @@
     <div class="band band-dark">
     <section class="hero">
       <div class="hero-copy">
-        <h1>Before making a payment, find out how much it actually costs.</h1>
-        <p class="lede">Paste a message, type an amount or snap a photo of a price. payprooof converts it at the real rate, shows hidden exchange fees and spots the signs of a scam.</p>
+        <h1>Know what a payment really costs before you make it.</h1>
+        <p class="lede">Take a picture of a price, input a sum or paste a message. PayProoof detects indicators of fraud, displays hidden exchange fees, and converts it at the actual rate.</p>
         <div class="hero-actions">
           <a href="#checker" class="btn btn-primary">Start a check</a>
           <a href="#how" class="btn btn-quiet">See how it works</a>
@@ -66,8 +67,8 @@
       <figure class="note" id="note" aria-label="Illustration of a banknote being checked with a magnifying lens">
         <svg class="note-pattern" id="notePattern" viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" aria-hidden="true"></svg>
         <div class="note-content" aria-hidden="true">
-          <span class="note-amount">£300.00</span>
-          <span class="note-line">Real rate 1 GBP = 1.1512 EUR</span>
+          <span class="note-amount" id="noteAmount">£300.00</span>
+          <span class="note-line" id="noteLine">Loading today's real rate</span>
           <span class="note-stamp">
             <svg><use href="#i-safe"/></svg> Checked
           </span>
@@ -97,7 +98,7 @@
           </svg>
           <div>
             <h3>Show it what you're looking at</h3>
-            <p>Type an amount, paste a payment request, or take a photo of a price, a bill or an exchange-rate board.</p>
+            <p>You can take a picture of a price, bill or exchange rate board, type an amount or paste a payment request.</p>
           </div>
         </li>
 
@@ -111,7 +112,7 @@
           </svg>
           <div>
             <h3>It checks against the real rate</h3>
-            <p>It looks up today's mid-market exchange rate, works out the hidden markup, and looks for common scam warning signs.</p>
+            <p>It calculates the hidden markup, checks for typical scam warning indicators and looks up the current middle market exchange rate.</p>
           </div>
         </li>
 
@@ -123,7 +124,7 @@
           </svg>
           <div>
             <h3>You get a clear answer</h3>
-            <p>Every result shows a shape, a word and a short reason, so it's easy to understand at a glance.</p>
+            <p>Every result shows a shape, a word and a short reason. If something looks wrong, one button sends it to someone you trust for a second opinion.</p>
           </div>
         </li>
       </ol>
@@ -221,7 +222,7 @@
     <div class="band band-dark">
     <section class="compare" id="compare" aria-labelledby="compare-title">
       <h2 id="compare-title">Compare before you send</h2>
-      <p class="compare-intro">See how much the person you're paying would actually receive with different providers.</p>
+      <p class="compare-intro">Type in the offers you've been given and see exactly how much the person you're paying would receive with each one.</p>
       <div class="compare-panel">
         <form class="compare-form" id="compareForm">
           <label class="field">
@@ -233,7 +234,17 @@
             <select id="compareTo"></select>
           </label>
         </form>
-        <p class="compare-note" id="compareNote">Example fees, using today's real mid-market rate. Change the amount or currency to try it.</p>
+
+        <div class="real-rate" id="realRate" aria-live="polite"></div>
+
+        <h3 class="offers-title">Offers you've been given</h3>
+        <p class="compare-note">Find the rate and fee in your bank app, on an exchange desk board, or on a provider's website.</p>
+        <div class="offers" id="offers"></div>
+        <div class="offer-actions">
+          <button type="button" class="btn btn-quiet" id="addOffer">Add another offer</button>
+          <a class="btn btn-quiet" id="wiseCompareLink" href="https://wise.com" target="_blank" rel="noopener">See Wise's price</a>
+        </div>
+
         <div id="compareResults" aria-live="polite"></div>
       </div>
     </section>
@@ -263,8 +274,29 @@
   </main>
 
   <footer class="site-footer">
-    <p>payprooof is a quick safety check, not financial advice. Exchange rates are mid-market rates from Frankfurter.</p>
+    <p>PayProoof is a quick safety check, not financial advice. Exchange rates are mid-market rates from Frankfurter.</p>
   </footer>
+
+  <!-- ===== Ask someone you trust ===== -->
+  <dialog id="trustPanel" class="access-panel trust-panel" aria-labelledby="trust-title">
+    <div class="panel-head">
+      <h2 id="trust-title">Ask someone you trust</h2>
+      <button type="button" class="icon-btn" id="closeTrust" aria-label="Close">
+        <svg aria-hidden="true"><use href="#i-close"/></svg>
+      </button>
+    </div>
+    <p class="trust-why">Scammers want you to decide quickly and on your own. A second opinion from a friend or family member takes a minute and can save you a lot.</p>
+    <label for="trustMessage" class="trust-label">Your message (you can change it)</label>
+    <textarea id="trustMessage" rows="7"></textarea>
+    <div class="trust-actions">
+      <a class="btn btn-primary" id="trustWhatsApp" target="_blank" rel="noopener">Send on WhatsApp</a>
+      <a class="btn btn-quiet" id="trustSms">Send a text</a>
+      <a class="btn btn-quiet" id="trustEmail">Send an email</a>
+      <button type="button" class="btn btn-quiet" id="trustCopy">Copy message</button>
+      <button type="button" class="btn btn-quiet hidden" id="trustShare">More ways to share</button>
+    </div>
+    <p class="trust-status" id="trustStatus" role="status"></p>
+  </dialog>
 
   <!-- ===== Accessibility settings ===== -->
   <dialog id="accessPanel" class="access-panel" aria-labelledby="access-title">
@@ -296,6 +328,6 @@
 
   <!-- Free photo reader (no key needed) -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-  <script src="app.js"></script>
+  <script src="app.js?v=7"></script>
 </body>
 </html>
