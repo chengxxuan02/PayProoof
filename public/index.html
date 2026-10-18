@@ -7,11 +7,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Lexend:wght@400;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=12">
+  <link rel="stylesheet" href="style.css?v=15">
 </head>
 <body>
 
-  <!-- ===== Icons (drawn once, reused everywhere with <use>) ===== -->
+  <!-- Icons: drawn once here, then reused across the page -->
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
     <symbol id="i-logo" viewBox="0 0 32 32"><rect x="2" y="6" width="28" height="20" rx="4" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M10 16.5l4 4 8-9" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-auto" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15.5 8.5l-2 5-5 2 2-5z" fill="currentColor"/></symbol>
@@ -32,7 +32,7 @@
 
   <a class="skip-link" href="#checker">Skip to the checker</a>
 
-  <!-- ===== Header ===== -->
+  <!-- Header -->
   <header class="site-header">
     <a class="logo" href="#top" aria-label="PayProoof home">
       <svg class="logo-mark" aria-hidden="true"><use href="#i-logo"/></svg>
@@ -52,7 +52,7 @@
 
   <main id="top">
 
-    <!-- ===== Hero ===== -->
+    <!-- Top section -->
     <div class="band band-dark">
     <section class="hero">
       <div class="hero-copy">
@@ -81,7 +81,7 @@
     </section>
     </div>
 
-    <!-- ===== How it works (the coin moves down as you scroll) ===== -->
+    <!-- How it works: the coin moves down as you scroll -->
     <div class="band band-bright">
     <section class="how" id="how" aria-labelledby="how-title">
       <h2 id="how-title">How it works</h2>
@@ -132,7 +132,7 @@
     </section>
     </div>
 
-    <!-- ===== The checker ===== -->
+    <!-- The checker -->
     <div class="band band-soft">
     <section class="checker" id="checker" aria-labelledby="checker-title">
       <div class="checker-head">
@@ -219,7 +219,7 @@
     </section>
     </div>
 
-    <!-- ===== Compare providers ===== -->
+    <!-- Compare offers -->
     <div class="band band-dark">
     <section class="compare" id="compare" aria-labelledby="compare-title">
       <h2 id="compare-title">Compare before you send</h2>
@@ -251,7 +251,7 @@
     </section>
     </div>
 
-    <!-- ===== Verdict key (for visual learners and colour-blind users) ===== -->
+    <!-- Reading a result: explains the shapes, for visual learners and colour-blind users -->
     <div class="band band-light">
     <section class="key" id="key" aria-labelledby="key-title">
       <h2 id="key-title">Reading a result</h2>
@@ -278,7 +278,7 @@
     <p>PayProoof is a quick safety check, not financial advice. Exchange rates are mid-market rates from Frankfurter.</p>
   </footer>
 
-  <!-- ===== Ask someone you trust ===== -->
+  <!-- Ask someone you trust -->
   <dialog id="trustPanel" class="access-panel trust-panel" aria-labelledby="trust-title">
     <div class="panel-head">
       <h2 id="trust-title">Ask someone you trust</h2>
@@ -299,7 +299,7 @@
     <p class="trust-status" id="trustStatus" role="status"></p>
   </dialog>
 
-  <!-- ===== Accessibility settings ===== -->
+  <!-- Accessibility settings panel -->
   <dialog id="accessPanel" class="access-panel" aria-labelledby="access-title">
     <div class="panel-head">
       <h2 id="access-title">Accessibility</h2>
@@ -327,8 +327,8 @@
     <button type="button" class="btn btn-quiet reset-btn" id="resetAccess">Reset to default</button>
   </dialog>
 
-  <!-- Free photo reader (no key needed) -->
+  <!-- Free photo reader that runs in the browser -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-  <script src="app.js?v=12"></script>
+  <script src="app.js?v=14"></script>
 </body>
 </html>
