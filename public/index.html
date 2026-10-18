@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Lexend:wght@400;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=15">
+  <link rel="stylesheet" href="style.css?v=16">
 </head>
 <body>
 
@@ -23,6 +23,7 @@
     <symbol id="i-access" viewBox="0 0 24 24"><circle cx="12" cy="4.5" r="2" fill="currentColor"/><path d="M5 8.5l7 1.5 7-1.5M12 10v5m0 0l-3 6m3-6l3 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-people" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="17" cy="9" r="2.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 14.2c2.8-.4 5 1.8 5 4.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
     <symbol id="i-save" viewBox="0 0 24 24"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 19h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-swap" viewBox="0 0 24 24"><path d="M4 8h15m-4-4l4 4-4 4M20 16H5m4-4l-4 4 4 4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-sound" viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
     <!-- Verdict shapes: each one is a different shape, not just a different colour -->
     <symbol id="i-safe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="currentColor"/><path d="M7 12.5l3.2 3.2L17 9" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
@@ -35,8 +36,9 @@
   <!-- Header -->
   <header class="site-header">
     <a class="logo" href="#top" aria-label="PayProoof home">
-      <svg class="logo-mark" aria-hidden="true"><use href="#i-logo"/></svg>
-      <span>PayProoof</span>
+      <img class="logo-mark" src="img/logo-detective.png" alt="">
+      <!-- Two of the o's are eyes that follow the mouse -->
+      <span class="wordmark" aria-hidden="true">PayPr<span class="eye"><span class="pupil"></span></span><span class="eye"><span class="pupil"></span></span>of</span>
     </a>
     <nav class="site-nav" aria-label="Main">
       <a href="#how">How it works</a>
@@ -56,8 +58,8 @@
     <div class="band band-dark">
     <section class="hero">
       <div class="hero-copy">
-        <h1>Know what a payment really costs before you make it.</h1>
-        <p class="lede">Paste a message, type an amount or snap a photo of a price. PayProoof converts it at the real rate, shows hidden exchange fees and spots the signs of a scam.</p>
+        <h1>Before you make a payment, know how much it will actually cost.</h1>
+        <p class="lede">Paste a message, enter a sum, or take a photo of a price. PayProoof translates it at the actual rate, displays any hidden exchange fees and detects scams.</p>
         <div class="hero-actions">
           <a href="#checker" class="btn btn-primary">Start a check</a>
           <a href="#how" class="btn btn-quiet">See how it works</a>
@@ -99,7 +101,7 @@
           </svg>
           <div>
             <h3>Show it what you're looking at</h3>
-            <p>Type an amount, paste a payment request, or take a photo of a price, a bill or an exchange-rate board.</p>
+            <p>You can take a picture of a price, bill or exchange rate board then type an amount or paste a payment request</p>
           </div>
         </li>
 
@@ -113,7 +115,7 @@
           </svg>
           <div>
             <h3>It checks against the real rate</h3>
-            <p>It looks up today's mid-market exchange rate, works out the hidden markup, and looks for common scam warning signs.</p>
+            <p>It checks today's middle market exchange rate, calculates the concealed markup, and searches for typical scam red flags.</p>
           </div>
         </li>
 
@@ -226,10 +228,17 @@
       <p class="compare-intro">Type in the offers you've been given and see exactly how much the person you're paying would receive with each one.</p>
       <div class="compare-panel">
         <form class="compare-form" id="compareForm">
-          <label class="field">
-            <span>You send in <span id="compareFromCode">GBP</span></span>
-            <input type="number" id="compareAmount" value="1000" min="1" step="any" inputmode="decimal">
-          </label>
+          <div class="field">
+            <label for="compareAmount">You send</label>
+            <div class="money-input">
+              <input type="number" id="compareAmount" value="1000" min="1" step="any" inputmode="decimal">
+              <select id="compareFrom" aria-label="Currency you send"></select>
+            </div>
+          </div>
+          <!-- Swaps the two currencies round -->
+          <button type="button" class="swap-btn" id="compareSwap" aria-label="Swap the currencies" title="Swap the currencies">
+            <svg aria-hidden="true"><use href="#i-swap"/></svg>
+          </button>
           <label class="field">
             <span>They receive in</span>
             <select id="compareTo"></select>
@@ -329,6 +338,6 @@
 
   <!-- Free photo reader that runs in the browser -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-  <script src="app.js?v=14"></script>
+  <script src="app.js?v=16"></script>
 </body>
 </html>

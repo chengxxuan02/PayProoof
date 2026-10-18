@@ -1,17 +1,8 @@
-// =====================================================================
-//  PayProoof - frontend logic
-//
-//  Sections in this file:
-//   1. The checker (mode buttons, examples, photos, sending messages)
-//   2. TEMPORARY replies (replaced in Stage 5)
-//   3. Helpers for showing messages and cards
-//   4. Accessibility settings
-//   5. Visual effects (banknote lens, scrolling coin)
-// =====================================================================
+// PayProoof
+// This file makes the page work: it reads what the user types or photographs,
+// gets the real exchange rate, checks for scam warning signs and shows the result.
 
-const BACKEND_URL = '/api/analyze';
-
-// ---------- Find the parts of the page we need ----------
+// --- Find the parts of the page we need ---
 const chat = document.getElementById('chat');
 const welcome = document.getElementById('welcome');
 const form = document.getElementById('composer');
@@ -26,6 +17,7 @@ const modeButtons = document.querySelectorAll('.mode');
 let currentMode = 'auto';
 let currentImage = null; // the attached photo
 
+// Hint text in the message box for each mode
 const PLACEHOLDERS = {
   auto: 'Type an amount, a rate or paste a message',
   convert: 'For example: How much is €250?',
@@ -33,11 +25,9 @@ const PLACEHOLDERS = {
   scam: 'Paste the message or payment request here',
 };
 
-// =====================================================================
-//  1. The checker
-// =====================================================================
+// ===== The checker =====
 
-// ---------- Mode buttons ----------
+// --- Mode buttons ---
 modeButtons.forEach((btn) => {
   btn.addEventListener('click', () => {
     modeButtons.forEach((b) => {
@@ -52,7 +42,7 @@ modeButtons.forEach((btn) => {
   });
 });
 
-// ---------- Example buttons ----------
+// --- Example buttons ---
 document.querySelectorAll('.example').forEach((btn) => {
   btn.addEventListener('click', () => {
     input.value = btn.dataset.text;
@@ -60,8 +50,8 @@ document.querySelectorAll('.example').forEach((btn) => {
   });
 });
 
-// ---------- Photo upload ----------
-// Phone photos are huge, so we shrink them before sending them to the AI
+// --- Photo upload ---
+// Phone photos are very big, so we shrink them first to make reading them faster
 imageInput.addEventListener('change', () => {
   const file = imageInput.files[0];
   if (!file) return;
@@ -85,13 +75,14 @@ imageInput.addEventListener('change', () => {
 
 removeImageBtn.addEventListener('click', clearImage);
 
+// Removes the attached photo
 function clearImage() {
   currentImage = null;
   imageInput.value = '';
   preview.classList.add('hidden');
 }
 
-// ---------- When the user presses Check ----------
+// --- When the user presses Check ---
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
   const text = input.value.trim();
@@ -120,26 +111,13 @@ form.addEventListener('submit', async (event) => {
   }
 });
 
-// =====================================================================
-//  2. Working out what the user wants, and showing the answer
-// =====================================================================
+// ===== Understanding the message =====
 
+// Works out what the user wants and returns the result to show
 async function analyse(text, image) {
   const homeCurrency = homeSelect.value;
 
-  // Ask the AI backend first (the server from Stage 8)
-  try {
-    const res = await fetch(BACKEND_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, image, homeCurrency, mode: currentMode }),
-    });
-    if (res.ok) return await res.json();
-  } catch (e) {
-    // No backend running, so we use the built-in checker below
-  }
-
-  // No AI: read any text in the photo with Tesseract (free, runs in the browser)
+  // If there's a photo, read the text in it and check that text too
   if (image) {
     const photoText = await readPhotoText(image);
     if (!photoText && !text) {
@@ -165,8 +143,9 @@ async function readPhotoText(image) {
   }
 }
 
-// ---------- Built-in checker (works without the AI) ----------
+// --- Choosing which check to run ---
 
+// Decides which check to run: scam check, rate check or conversion
 function localAnalyse(text, home, mode) {
   const scamReasons = SCAM_RULES.filter((rule) => rule.re.test(text)).map((rule) => rule.reason);
   const rateOffer = parseRateOffer(text);
@@ -210,7 +189,7 @@ function localAnalyse(text, home, mode) {
   return makeConvert() || askAnything;
 }
 
-// ---------- Understanding currencies in normal writing ----------
+// --- Understanding currencies in normal writing ---
 
 // Currencies the live rate service supports
 const SUPPORTED = ['AED', 'AUD', 'BRL', 'CAD', 'CHF', 'CNY', 'EUR', 'GBP', 'HKD', 'INR',
@@ -234,6 +213,7 @@ const CURRENCY_WORDS = {
   aud: 'AUD', cad: 'CAD', sgd: 'SGD', hkd: 'HKD', mxn: 'MXN',
 };
 
+// Turns a word or symbol like "euros" or "€" into a currency code like EUR
 function toCode(token) {
   if (!token) return null;
   const word = token.toLowerCase();
@@ -358,8 +338,9 @@ function parseFee(text) {
   return { value: m ? toNum(m[1]) : 0, percent: false };
 }
 
-// ---------- Scam warning signs ----------
+// --- Scam warning signs ---
 
+// Each rule is a pattern to look for, and the reason it's a warning sign
 const SCAM_RULES = [
   { re: /urgent|immediately|right now|today only|within \d* ?hours?|asap|last chance/i,
     reason: "Pressure to pay quickly. Scammers rush you so you don't stop to check." },
@@ -383,47 +364,56 @@ const SCAM_RULES = [
     reason: '"New number" family message. A common impersonation scam.' },
 ];
 
-// ---------- Live exchange rates ----------
-// 1. Wise's rate, through our server (if it has a Wise token)
-// 2. Otherwise, the European Central Bank rate from Frankfurter
+// Gets the real exchange rate between two currencies from Frankfurter
 async function getRate(from, to) {
   if (from === to) return { rate: 1, date: new Date().toISOString(), source: 'none' };
   if (!SUPPORTED.includes(from) || !SUPPORTED.includes(to)) {
     throw new Error(`Unsupported currency: ${from} or ${to}`);
   }
 
+  // Frankfurter: today's rates first, then the European Central Bank feed as a backup.
+  // We keep whichever answer is most recent, so an old rate is never used by mistake.
+  const answers = [];
   try {
-    const res = await fetch(`/api/rate?from=${from}&to=${to}`);
+    const res = await fetch(`https://api.frankfurter.dev/v2/rates?base=${from}&quotes=${to}`);
     if (res.ok) {
       const data = await res.json();
-      if (data.rate) return { rate: data.rate, date: data.date, source: 'Wise' };
+      const row = Array.isArray(data) ? data.find((r) => r.quote === to) : null;
+      if (row && row.rate) answers.push({ rate: row.rate, date: row.date });
     }
-  } catch (e) {
-    // No server
+  } catch (e) { /* try the backup */ }
+
+  if (!answers.length || daysOld(answers[0].date) > 3) {
+    try {
+      const res = await fetch(`https://api.frankfurter.dev/v1/latest?from=${from}&to=${to}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.rates && data.rates[to]) answers.push({ rate: data.rates[to], date: data.date });
+      }
+    } catch (e) { /* no backup available */ }
   }
 
-  const res = await fetch(`https://api.frankfurter.dev/v2/rate/${from.toLowerCase()}/${to.toLowerCase()}`);
-  if (!res.ok) throw new Error(`Frankfurter replied ${res.status}`);
-  const data = await res.json();
-  if (!data.rate) throw new Error('No rate in the reply');
-  return { rate: data.rate, date: data.date, source: 'Frankfurter' };
+  if (!answers.length) throw new Error('No exchange rate available');
+  answers.sort((a, b) => new Date(b.date) - new Date(a.date));
+  return { ...answers[0], source: 'Frankfurter' };
 }
 
-// =====================================================================
-//  Result cards
-// =====================================================================
+// ===== Result cards =====
 
-// The AI may say green/amber/red; the page uses safe/caution/danger
+// Makes sure a verdict is one of: safe, caution or danger
 function normaliseVerdict(v) {
   return { green: 'safe', amber: 'caution', red: 'danger' }[v] || (['safe', 'caution', 'danger'].includes(v) ? v : 'caution');
 }
 
+// Which icon goes with each verdict
 const VERDICT_ICON = { safe: 'i-safe', caution: 'i-caution', danger: 'i-danger' };
 
+// The coloured label at the top of a result, with its shape
 function verdictBadge(verdict, label) {
   return `<span class="verdict ${verdict}"><svg aria-hidden="true"><use href="#${VERDICT_ICON[verdict]}"/></svg>${label}</span>`;
 }
 
+// Picks the right card to show for each type of result
 async function renderResult(result) {
   switch (result.type) {
     case 'convert': return renderConvert(result);
@@ -438,12 +428,13 @@ async function renderResult(result) {
   }
 }
 
+// Link that opens the same conversion on Wise's website
 function wiseLink(from, to, amount) {
   const url = `https://wise.com/gb/currency-converter/${from.toLowerCase()}-to-${to.toLowerCase()}-rate?amount=${Math.round(amount * 100) / 100}`;
   return `<a class="card-link" href="${url}" target="_blank" rel="noopener">See this conversion on Wise</a>`;
 }
 
-// ---------- Convert ----------
+// --- Convert ---
 async function renderConvert({ amount, from, to }) {
   const { rate, date, source } = await getRate(from, to);
   const converted = amount * rate;
@@ -462,6 +453,15 @@ async function renderConvert({ amount, from, to }) {
         <div class="row"><span>Exchange rate</span><span>1 ${from} = ${rate.toFixed(4)} ${to}</span></div>
         <div class="row"><span>The other way</span><span>1 ${to} = ${(1 / rate).toFixed(4)} ${from}</span></div>
       </div>
+      <div class="convert-controls">
+        <label>Show in
+          <select class="convert-to" data-amount="${amount}" data-from="${from}">
+            ${SUPPORTED.filter((c) => c !== from).map((c) => `<option value="${c}"${c === to ? ' selected' : ''}>${c}</option>`).join('')}
+          </select>
+        </label>
+        <button type="button" class="convert-swap" data-amount="${amount}" data-from="${to}" data-to="${from}">
+          <svg aria-hidden="true"><use href="#i-swap"/></svg>Swap: ${money(amount, to)} into ${from}</button>
+      </div>
       <p class="note-small">This is the mid-market rate: the midpoint between the price to buy and the price to sell a currency. Banks and exchange desks often give you less.</p>
       ${wiseLink(from, to, amount)}
       ${saveButton({
@@ -474,7 +474,30 @@ async function renderConvert({ amount, from, to }) {
     </div>`;
 }
 
-// ---------- Rate check ----------
+// Redraws a conversion card in place with new currencies
+async function updateConvertCard(card, amount, from, to) {
+  try {
+    const holder = document.createElement('div');
+    holder.innerHTML = await renderConvert({ amount, from, to });
+    const fresh = holder.firstElementChild;
+    addSpeakButton(fresh);
+    card.replaceWith(fresh);
+    fresh.querySelector('.convert-swap')?.focus();
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+chat.addEventListener('change', (e) => {
+  const select = e.target.closest('.convert-to');
+  if (select) updateConvertCard(select.closest('.card'), parseFloat(select.dataset.amount), select.dataset.from, select.value);
+});
+chat.addEventListener('click', (e) => {
+  const btn = e.target.closest('.convert-swap');
+  if (btn) updateConvertCard(btn.closest('.card'), parseFloat(btn.dataset.amount), btn.dataset.from, btn.dataset.to);
+});
+
+// --- Rate check ---
 async function renderRate({ amount, from, to, offeredRate, fee = 0, feePercent = null, amountGuessed = false }) {
   const { rate: realRate, date, source } = await getRate(from, to);
 
@@ -549,7 +572,7 @@ async function renderRate({ amount, from, to, offeredRate, fee = 0, feePercent =
     </div>`;
 }
 
-// ---------- Scam check ----------
+// --- Scam check ---
 function renderScam({ verdict, reasons = [], advice, userText = '' }) {
   verdict = normaliseVerdict(verdict);
   const labels = { safe: 'No warning signs found', caution: 'Check first', danger: "Stop: don't send this money" };
@@ -603,13 +626,23 @@ function renderScam({ verdict, reasons = [], advice, userText = '' }) {
     </div>`;
 }
 
-// =====================================================================
-//  Good to know: honest limits shown under every result
-// =====================================================================
+// How many days old a rate is
+function daysOld(date) {
+  const d = new Date(date);
+  return isNaN(d) ? 999 : Math.floor((Date.now() - d.getTime()) / 86400000);
+}
 
-const RATE_NOTE = (source, date) => source === 'Wise'
-  ? `Rate from Wise on ${formatDate(date)}.`
-  : `Rates come from ${source}, which publishes reference rates from central banks once each working day. This one is from ${formatDate(date)}. The price a provider actually gives you can differ slightly.`;
+// ===== Good to know =====
+// Honest notes shown under every result, so nobody is misled
+
+// Note about where the rate comes from, with a warning if it's old
+const RATE_NOTE = (source, date) => {
+  const age = daysOld(date);
+  const warning = age > 4
+    ? ` Warning: this rate is ${age} days old because a newer one wasn't available, so today's real rate may be different.`
+    : '';
+  return `Rates come from ${source}, which publishes reference rates from central banks once each working day, so they don't move minute by minute like the rates on Google or in banking apps. This one is from ${formatDate(date)}.${warning}`;
+};
 
 // Advice checked against Take Five to Stop Fraud, UK Finance, GOV.UK and Which? in October 2026
 const BEFORE_YOU_PAY = [
@@ -629,23 +662,26 @@ function situationTips(text = '') {
   return tips;
 }
 
+// Shows a heading with a list of advice under it
 function adviceList(title, items) {
   return items.length ? `<h3>${title}</h3><ul>${items.map((s) => `<li>${escapeHtml(s)}</li>`).join('')}</ul>` : '';
 }
 
+// Reminder that the scam check can't catch everything
 const SCAM_NOTE = 'This check looks for common warning signs. It can miss new kinds of scams and can flag genuine messages, so always confirm with the person or company directly before you pay.';
 
+// The "Good to know" box under each result
 function goodToKnow(notes) {
   return `<div class="good-to-know"><strong>Good to know</strong><ul>${notes.map((n) => `<li>${escapeHtml(n)}</li>`).join('')}</ul></div>`;
 }
 
-// =====================================================================
-//  Save a PayProoof: turns a result into an image you can keep
-// =====================================================================
+// ===== Save a PayProoof =====
+// Turns a result into an image the user can keep as a record
 
 const savedProofs = new Map();
 let proofCount = 0;
 
+// Remembers what's in a result and adds the Save button for it
 function saveButton(record) {
   proofCount += 1;
   record.checkedAt = new Date();
@@ -725,6 +761,7 @@ function drawVerdictShape(ctx, verdict, x, y, size, colour) {
   ctx.stroke();
 }
 
+// Draws the saved PayProoof image
 function drawProof(record) {
   const css = getComputedStyle(document.documentElement);
   const col = (name, fallback) => css.getPropertyValue(name).trim() || fallback;
@@ -872,6 +909,7 @@ function drawProof(record) {
   return canvas;
 }
 
+// Downloads the image, or opens the share menu on phones
 function downloadProof(record) {
   if (!record) return;
   const canvas = drawProof(record);
@@ -893,15 +931,15 @@ function downloadProof(record) {
   }, 'image/png');
 }
 
-// =====================================================================
-//  Ask someone you trust
-// =====================================================================
+// ===== Ask someone you trust =====
 
+// The "Ask someone you trust" button, with the message ready to send
 function trustButton(message) {
   return `<button type="button" class="trust-btn" data-share="${escapeHtml(message)}">
     <svg aria-hidden="true"><use href="#i-people"/></svg>Ask someone you trust</button>`;
 }
 
+// Writes the message to send after a scam check
 function scamShareText(verdict, label, reasons, userText) {
   const quoted = userText ? `\n\nThe message says:\n"${userText.length > 400 ? `${userText.slice(0, 400)}…` : userText}"` : '';
   const signs = reasons.length ? `\n\nWarning signs it found:\n${reasons.map((r) => `- ${r}`).join('\n')}` : '';
@@ -922,6 +960,7 @@ function updateTrustLinks() {
   document.getElementById('trustEmail').href = `mailto:?subject=${encodeURIComponent('Can you check this before I pay?')}&body=${encoded}`;
 }
 
+// Opens the panel for sending the message
 function openTrust(message) {
   trustMessage.value = message;
   trustStatus.textContent = '';
@@ -958,19 +997,18 @@ trustShareBtn.addEventListener('click', async () => {
   }
 });
 
+// Shows a date like "17 October 2026"
 function formatDate(date) {
   const d = new Date(date);
   return isNaN(d) ? '' : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
-// =====================================================================
-//  Compare offers
-//  Every number here is either the live real rate or something the user typed.
-// =====================================================================
+// ===== Compare offers =====
+// Every number here is either the live real rate or something the user typed.
 
 const compareAmount = document.getElementById('compareAmount');
 const compareTo = document.getElementById('compareTo');
-const compareFromCode = document.getElementById('compareFromCode');
+const compareFrom = document.getElementById('compareFrom');
 const realRateBox = document.getElementById('realRate');
 const offersBox = document.getElementById('offers');
 const compareResults = document.getElementById('compareResults');
@@ -978,12 +1016,14 @@ const wiseCompareLink = document.getElementById('wiseCompareLink');
 let compareTimer = null;
 let offerCount = 0;
 
-// Fills the "They receive in" list with currency names
-function fillCompareCurrencies() {
-  const from = homeSelect.value;
+// Fills both currency lists. Sending starts as "My currency" but can be anything.
+function fillCompareCurrencies(from = compareFrom.value || homeSelect.value) {
   const previous = compareTo.value;
   let names = null;
   try { names = new Intl.DisplayNames(['en'], { type: 'currency' }); } catch { /* older browsers */ }
+
+  compareFrom.innerHTML = SUPPORTED.map((code) => `<option value="${code}">${code}</option>`).join('');
+  compareFrom.value = from;
 
   compareTo.innerHTML = SUPPORTED
     .filter((code) => code !== from)
@@ -992,7 +1032,6 @@ function fillCompareCurrencies() {
 
   const fallback = from === 'EUR' ? 'GBP' : 'EUR';
   compareTo.value = previous && previous !== from ? previous : fallback;
-  compareFromCode.textContent = from;
   updateOfferLabels();
 }
 
@@ -1030,14 +1069,15 @@ function addOffer(name = '') {
 
 // Shows the right currencies in each row's labels, e.g. "Their rate (1 GBP = ? EUR)"
 function updateOfferLabels() {
-  const from = homeSelect.value;
+  const from = compareFrom.value;
   const to = compareTo.value;
   offersBox.querySelectorAll('.rate-label').forEach((el) => { el.textContent = `Their rate: 1 ${from} = how many ${to}`; });
   offersBox.querySelectorAll('.fee-label').forEach((el) => { el.textContent = `Their fee in ${from}`; });
 }
 
+// Works out what each offer gives and shows them from best to worst
 async function updateCompare() {
-  const from = homeSelect.value;
+  const from = compareFrom.value;
   const to = compareTo.value;
   const amount = parseFloat(compareAmount.value);
   wiseCompareLink.href = `https://wise.com/gb/currency-converter/${from.toLowerCase()}-to-${to.toLowerCase()}-rate?amount=${amount || 1000}`;
@@ -1151,7 +1191,20 @@ document.getElementById('addOffer').addEventListener('click', () => {
   addOffer().querySelector('.offer-name').focus();
 });
 homeSelect.addEventListener('change', () => {
-  fillCompareCurrencies();
+  fillCompareCurrencies(homeSelect.value);
+  updateCompare();
+});
+compareFrom.addEventListener('change', () => {
+  fillCompareCurrencies(compareFrom.value);
+  updateCompare();
+});
+// Swap: what you send becomes what they receive, and the other way round
+document.getElementById('compareSwap').addEventListener('click', () => {
+  const oldFrom = compareFrom.value;
+  const oldTo = compareTo.value;
+  fillCompareCurrencies(oldTo);
+  compareTo.value = oldFrom;
+  updateOfferLabels();
   updateCompare();
 });
 
@@ -1159,14 +1212,14 @@ homeSelect.addEventListener('change', () => {
 addOffer();
 addOffer();
 
-// =====================================================================
-//  3. Helpers
-// =====================================================================
+// ===== Helpers =====
 
+// A simple card with a message in it
 function messageCard(text) {
   return `<div class="card"><p class="text">${escapeHtml(text)}</p></div>`;
 }
 
+// Shows what the user sent, on the right
 function addUserMessage(text, image) {
   const div = document.createElement('div');
   div.className = 'msg user';
@@ -1175,6 +1228,7 @@ function addUserMessage(text, image) {
   scrollDown();
 }
 
+// Shows a result card in the chat
 function addBotCard(html) {
   const div = document.createElement('div');
   div.className = 'msg bot';
@@ -1182,22 +1236,25 @@ function addBotCard(html) {
 
   // Every result gets a "Read aloud" button
   const cards = [...div.querySelectorAll('.card')];
-  if ('speechSynthesis' in window) {
-    cards.forEach((card) => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'speak-btn';
-      btn.innerHTML = '<svg aria-hidden="true"><use href="#i-sound"/></svg> Read aloud';
-      btn.addEventListener('click', () => speak(cardText(card)));
-      card.appendChild(btn);
-    });
-  }
+  cards.forEach(addSpeakButton);
 
   chat.appendChild(div);
   scrollDown();
   if (settings.readAloud && cards.length) speak(cards.map(cardText).join(' '));
 }
 
+// Adds a "Read aloud" button to a result card
+function addSpeakButton(card) {
+  if (!('speechSynthesis' in window)) return;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'speak-btn';
+  btn.innerHTML = '<svg aria-hidden="true"><use href="#i-sound"/></svg> Read aloud';
+  btn.addEventListener('click', () => speak(cardText(card)));
+  card.appendChild(btn);
+}
+
+// Shows the loading dots while a check runs
 function addLoading() {
   const div = document.createElement('div');
   div.className = 'msg bot';
@@ -1207,6 +1264,7 @@ function addLoading() {
   return div;
 }
 
+// Scrolls the chat to the newest message
 function scrollDown() {
   chat.scrollTop = chat.scrollHeight;
 }
@@ -1218,6 +1276,7 @@ function cardText(card) {
   return copy.innerText.replace(/\s+/g, ' ').trim();
 }
 
+// Reads text out loud using the browser's voice
 function speak(text) {
   if (!('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
@@ -1226,6 +1285,7 @@ function speak(text) {
   window.speechSynthesis.speak(utterance);
 }
 
+// Shows a number as money, like £12.50
 function money(value, currency) {
   try {
     return new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format(value);
@@ -1234,6 +1294,7 @@ function money(value, currency) {
   }
 }
 
+// Makes text safe to put on the page
 function escapeHtml(str) {
   return String(str)
     .replace(/&/g, '&amp;')
@@ -1242,12 +1303,12 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
-// =====================================================================
-//  4. Accessibility settings (saved in the browser)
-// =====================================================================
+// ===== Accessibility settings =====
+// Saved in the browser so they stay the same next time
 
 const root = document.documentElement;
 const panel = document.getElementById('accessPanel');
+// Settings when nothing has been changed yet
 const DEFAULTS = {
   textSize: '1',
   easyFont: false,
@@ -1259,6 +1320,7 @@ const DEFAULTS = {
 };
 let settings = loadSettings();
 
+// Loads saved settings from the browser
 function loadSettings() {
   try {
     const saved = JSON.parse(localStorage.getItem('payprooof-access') || '{}');
@@ -1268,6 +1330,7 @@ function loadSettings() {
   }
 }
 
+// Saves settings in the browser
 function saveSettings() {
   try {
     localStorage.setItem('payprooof-access', JSON.stringify(settings));
@@ -1323,11 +1386,10 @@ panel.addEventListener('click', (e) => {
   if (e.target === panel) panel.close();
 });
 
-// =====================================================================
-//  5. Visual effects
-// =====================================================================
+// ===== Visual effects =====
 
-// ---------- Banknote pattern (fine swirling lines, like security printing) ----------
+// --- Banknote pattern ---
+// Fine swirling lines, like the security printing on real notes
 function drawNotePattern() {
   const svg = document.getElementById('notePattern');
   const ns = 'http://www.w3.org/2000/svg';
@@ -1357,7 +1419,7 @@ function drawNotePattern() {
   }
 }
 
-// ---------- Magnifying lens that follows the mouse ----------
+// --- Magnifying lens that follows the mouse ---
 function setUpLens() {
   const note = document.getElementById('note');
   const micro = note.querySelector('.note-micro');
@@ -1373,11 +1435,12 @@ function setUpLens() {
   note.addEventListener('pointerleave', () => note.classList.remove('is-checking'));
 }
 
-// ---------- Coin that moves down "How it works" as you scroll ----------
+// --- Coin that moves down "How it works" as you scroll ---
 const stepsList = document.getElementById('steps');
 const stepItems = stepsList.querySelectorAll('.step');
 let scrollTicking = false;
 
+// Moves the coin and lights up each step as the page scrolls
 function updateScrollEffect() {
   scrollTicking = false;
   if (settings.reduceMotion) {
@@ -1404,7 +1467,7 @@ window.addEventListener('scroll', () => {
 }, { passive: true });
 window.addEventListener('resize', updateScrollEffect);
 
-// ---------- Live rate on the banknote ----------
+// --- Live rate on the banknote ---
 async function updateNoteRate() {
   const from = homeSelect.value;
   const to = from === 'EUR' ? 'GBP' : 'EUR';
@@ -1420,9 +1483,28 @@ async function updateNoteRate() {
 }
 homeSelect.addEventListener('change', updateNoteRate);
 
-// ---------- Start everything ----------
+// --- Logo eyes follow the mouse (or your finger) ---
+function setUpEyes() {
+  const pupils = document.querySelectorAll('.wordmark .pupil');
+  if (!pupils.length) return;
+  const look = (x, y) => {
+    if (document.documentElement.hasAttribute('data-reduce-motion')) return;
+    pupils.forEach((pupil) => {
+      const box = pupil.parentElement.getBoundingClientRect();
+      const angle = Math.atan2(y - (box.top + box.height / 2), x - (box.left + box.width / 2));
+      const reach = box.width * 0.2;
+      pupil.style.setProperty('--px', `${Math.cos(angle) * reach}px`);
+      pupil.style.setProperty('--py', `${Math.sin(angle) * reach}px`);
+    });
+  };
+  window.addEventListener('pointermove', (e) => look(e.clientX, e.clientY), { passive: true });
+  window.addEventListener('pointerdown', (e) => look(e.clientX, e.clientY), { passive: true });
+}
+
+// --- Start everything ---
 drawNotePattern();
 setUpLens();
+setUpEyes();
 applySettings();
 fillCompareCurrencies();
 updateCompare();
