@@ -109,6 +109,52 @@ form.addEventListener('submit', async (event) => {
     loading.remove();
     addBotCard(messageCard("Today's exchange rate didn't load. Wait a moment and try again."));
   }
+  saveChat();
+});
+
+// ===== Keeping your chat =====
+// Your checks stay in this tab, even if you refresh, until you press New chat
+// or close the tab. Nothing is sent anywhere: it's stored in your own browser.
+const CHAT_KEY = 'payprooof-chat';
+
+// Saves the chat so it's still there after a refresh
+function saveChat() {
+  const data = { html: chat.innerHTML, proofs: [...savedProofs], count: proofCount };
+  try {
+    sessionStorage.setItem(CHAT_KEY, JSON.stringify(data));
+  } catch {
+    // Photos can make the chat too big to store, so try again without them
+    try {
+      data.html = data.html.replace(/<img[^>]*>/g, '<p class="note-small">Photo not kept after refresh</p>');
+      sessionStorage.setItem(CHAT_KEY, JSON.stringify(data));
+    } catch { /* storage not available, the chat just won't survive a refresh */ }
+  }
+}
+
+// Brings back the chat after a refresh
+function restoreChat() {
+  let data = null;
+  try { data = JSON.parse(sessionStorage.getItem(CHAT_KEY)); } catch { /* nothing saved */ }
+  if (!data || !data.html) return;
+  chat.innerHTML = data.html;
+  (data.proofs || []).forEach(([id, record]) => {
+    record.checkedAt = new Date(record.checkedAt);
+    savedProofs.set(id, record);
+  });
+  proofCount = data.count || 0;
+  // The Read aloud buttons need setting up again
+  chat.querySelectorAll('.speak-btn').forEach((btn) => btn.remove());
+  chat.querySelectorAll('.card').forEach(addSpeakButton);
+  scrollDown();
+}
+
+// New chat: clears your checks and shows the examples again
+document.getElementById('newChat').addEventListener('click', () => {
+  window.speechSynthesis?.cancel();
+  chat.innerHTML = '';
+  chat.appendChild(welcome);
+  try { sessionStorage.removeItem(CHAT_KEY); } catch { /* nothing to clear */ }
+  input.focus();
 });
 
 // ===== Understanding the message =====
@@ -483,6 +529,7 @@ async function updateConvertCard(card, amount, from, to) {
     addSpeakButton(fresh);
     card.replaceWith(fresh);
     fresh.querySelector('.convert-swap')?.focus();
+    saveChat();
   } catch (err) {
     console.error(err);
   }
@@ -1120,7 +1167,10 @@ async function updateCompare() {
     const received = Math.max(0, amount - fee) * rate;
     const loss = Math.max(0, fair - received);
     const percent = (loss / fair) * 100;
-    offers.push({ name, rate, fee, received, loss, percent, flipped });
+    // Split the loss into the part from a worse rate and the part from the fee
+    const ratePercent = Math.max(0, ((real.rate - rate) / real.rate) * 100);
+    const feePercent = (fee / amount) * 100;
+    offers.push({ name, rate, fee, received, loss, percent, flipped, ratePercent, feePercent });
   });
 
   if (!offers.length) {
@@ -1147,7 +1197,7 @@ async function updateCompare() {
               ${verdictBadge(verdict, labels[verdict])}
             </div>
             <div class="provider-rate">Rate ${o.rate.toFixed(4)}<br>Fee ${money(o.fee, from)}${o.flipped ? '<br>Rate flipped, it looked upside down' : ''}</div>
-            <div class="provider-gets">${money(o.received, to)}<span class="provider-loss">${o.loss > 0 ? `${money(o.loss, to)} less, ${o.percent.toFixed(1)}%` : 'Same as the real rate'}</span></div>
+            <div class="provider-gets">${money(o.received, to)}<span class="provider-loss">${o.loss > 0 ? `${money(o.loss, to)} less, ${o.percent.toFixed(1)}%` : 'Same as the real rate'}</span>${o.loss > 0 && o.fee > 0 ? `<span class="provider-split">${o.ratePercent.toFixed(1)}% from the rate, ${o.feePercent.toFixed(1)}% from the fee</span>` : ''}</div>
             <div class="provider-bar" aria-hidden="true"><span style="width:${Math.max(2, (o.received / fair) * 100).toFixed(1)}%"></span></div>
           </li>`;
       }).join('')}
@@ -1506,6 +1556,7 @@ drawNotePattern();
 setUpLens();
 setUpEyes();
 applySettings();
+restoreChat();
 fillCompareCurrencies();
 updateCompare();
 updateNoteRate();

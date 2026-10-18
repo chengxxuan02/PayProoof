@@ -750,7 +750,7 @@ html[data-contrast] {
 .wordmark { display: inline-flex; align-items: baseline; white-space: nowrap; }
 .eye {
   position: relative; display: inline-block;
-  width: 0.7em; height: 0.7em; margin: 0 0.03em;
+  width: 0.6em; height: 0.6em; margin: 0 0.03em;
   border-radius: 50%;
   background: #fff;
   overflow: hidden;
@@ -758,7 +758,7 @@ html[data-contrast] {
 }
 .pupil {
   position: absolute; left: 50%; top: 50%;
-  width: 0.36em; height: 0.36em; margin: -0.18em 0 0 -0.18em;
+  width: 0.3em; height: 0.3em; margin: -0.15em 0 0 -0.15em;
   border-radius: 50%;
   background: var(--band-dark);
   transform: translate(var(--px, 0.06em), var(--py, 0.06em));
@@ -812,3 +812,37 @@ html[data-contrast] .pupil { background: #000; }
 }
 .convert-swap svg { width: 18px; height: 18px; }
 .convert-swap:hover { background: var(--deep); color: #fff; border-color: var(--deep); }
+
+/* Third o in the logo: a magnifying glass */
+.lens {
+  position: relative; display: inline-block;
+  width: 0.62em; height: 0.62em; margin: 0 0.07em 0 0.12em;
+  border: 0.1em solid currentColor; border-radius: 50%;
+  background: color-mix(in srgb, var(--band-bright) 30%, transparent);
+}
+.lens::before {   /* shine on the glass */
+  content: ""; position: absolute; right: 14%; top: 12%;
+  width: 34%; height: 22%; border-radius: 50%;
+  background: currentColor; opacity: 0.8; transform: rotate(35deg);
+}
+.lens::after {    /* the handle */
+  content: ""; position: absolute; left: 18%; top: 82%;
+  width: 0.3em; height: 0.12em; border-radius: 0.06em;
+  background: currentColor;
+  transform: rotate(135deg); transform-origin: left center;
+}
+.logo:hover .lens { animation: lens-look 0.8s ease-in-out; }
+@keyframes lens-look { 0%, 100% { transform: rotate(0); } 30% { transform: rotate(-14deg); } 70% { transform: rotate(10deg); } }
+
+.provider-split { display: block; font-size: 0.8rem; color: var(--muted); }
+
+/* --- New chat button --- */
+.new-chat-btn {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  min-height: 44px; padding: 0 1rem;
+  border: 2px solid var(--line); border-radius: 999px;
+  background: var(--surface); color: var(--deep);
+  font: inherit; font-size: 0.92rem; font-weight: 700; cursor: pointer;
+}
+.new-chat-btn svg { width: 18px; height: 18px; }
+.new-chat-btn:hover { background: var(--deep); color: #fff; border-color: var(--deep); }

@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Lexend:wght@400;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=16">
+  <link rel="stylesheet" href="style.css?v=20">
 </head>
 <body>
 
@@ -24,6 +24,7 @@
     <symbol id="i-people" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="17" cy="9" r="2.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 14.2c2.8-.4 5 1.8 5 4.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
     <symbol id="i-save" viewBox="0 0 24 24"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 19h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-swap" viewBox="0 0 24 24"><path d="M4 8h15m-4-4l4 4-4 4M20 16H5m4-4l-4 4 4 4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></symbol>
     <symbol id="i-sound" viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
     <!-- Verdict shapes: each one is a different shape, not just a different colour -->
     <symbol id="i-safe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="currentColor"/><path d="M7 12.5l3.2 3.2L17 9" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
@@ -36,9 +37,9 @@
   <!-- Header -->
   <header class="site-header">
     <a class="logo" href="#top" aria-label="PayProoof home">
-      <img class="logo-mark" src="img/logo-detective.png" alt="">
-      <!-- Two of the o's are eyes that follow the mouse -->
-      <span class="wordmark" aria-hidden="true">PayPr<span class="eye"><span class="pupil"></span></span><span class="eye"><span class="pupil"></span></span>of</span>
+      <img class="logo-mark" alt="" src="data:image/png;base64,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">
+      <!-- Two of the o's are eyes that follow the mouse, and the third is a magnifying glass -->
+      <span class="wordmark" aria-hidden="true">PayPr<span class="eye"><span class="pupil"></span></span><span class="eye"><span class="pupil"></span></span><span class="lens"></span>f</span>
     </a>
     <nav class="site-nav" aria-label="Main">
       <a href="#how">How it works</a>
@@ -58,8 +59,8 @@
     <div class="band band-dark">
     <section class="hero">
       <div class="hero-copy">
-        <h1>Before you make a payment, know how much it will actually cost.</h1>
-        <p class="lede">Paste a message, enter a sum, or take a photo of a price. PayProoof translates it at the actual rate, displays any hidden exchange fees and detects scams.</p>
+        <h1>Know what a payment really costs before you make it.</h1>
+        <p class="lede">Paste a message, type an amount or snap a photo of a price. PayProoof converts it at the real rate, shows hidden exchange fees and spots the signs of a scam.</p>
         <div class="hero-actions">
           <a href="#checker" class="btn btn-primary">Start a check</a>
           <a href="#how" class="btn btn-quiet">See how it works</a>
@@ -101,7 +102,7 @@
           </svg>
           <div>
             <h3>Show it what you're looking at</h3>
-            <p>You can take a picture of a price, bill or exchange rate board then type an amount or paste a payment request</p>
+            <p>Type an amount, paste a payment request, or take a photo of a price, a bill or an exchange-rate board.</p>
           </div>
         </li>
 
@@ -115,7 +116,7 @@
           </svg>
           <div>
             <h3>It checks against the real rate</h3>
-            <p>It checks today's middle market exchange rate, calculates the concealed markup, and searches for typical scam red flags.</p>
+            <p>It looks up today's mid-market exchange rate, works out the hidden markup, and looks for common scam warning signs.</p>
           </div>
         </li>
 
@@ -164,6 +165,9 @@
             <option value="ZAR">ZAR, South African rand</option>
           </select>
         </label>
+        <button type="button" class="new-chat-btn" id="newChat">
+          <svg aria-hidden="true"><use href="#i-plus"/></svg>New chat
+        </button>
       </div>
 
       <div class="modes" role="radiogroup" aria-label="What do you want to check?">
@@ -338,6 +342,6 @@
 
   <!-- Free photo reader that runs in the browser -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-  <script src="app.js?v=16"></script>
+  <script src="app.js?v=20"></script>
 </body>
 </html>
