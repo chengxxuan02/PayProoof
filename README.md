@@ -24,7 +24,7 @@ We built PayProoof with a core focus on accessibility, ensuring that financial s
 
 ## Usage
 
-To get started with PayProoof, the hosted version of the product can be used. You can get started immediately at https://pay-prooof.netlify.app
+To get started with PayProoof, the hosted version of the product can be used. You can get started immediately at https://pay-prooof.netlify.app/public
 
 1. Select your home currency from the top right.
 2. Use the mode buttons to select Auto, Convert, Rate Check or Scam Check.
