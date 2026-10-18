@@ -1,8 +1,28 @@
-/* PayProoof styles
-   Change the colours in :root to change the colours across the whole site. */
+/* ============================================================= */
+/* PayProoof styles                                              */
+/*                                                               */
+/* Structure of this file:                                       */
+/*   1. Design tokens (colours, fonts)                           */
+/*   2. Accessibility setting overrides                          */
+/*   3. Base / reset styles                                      */
+/*   4. Buttons                                                  */
+/*   5. Header                                                   */
+/*   6. Hero + banknote illustration                             */
+/*   7. How it works                                             */
+/*   8. Checker (chat UI)                                        */
+/*   9. Result cards (receipts)                                  */
+/*  10. Comparison section                                       */
+/*  11. Verdict key, footer, dialogs                             */
+/*  12. Colour bands (page-level section backgrounds)            */
+/*  13. Misc: logo eyes, swap buttons, save buttons              */
+/*                                                               */
+/* Every colour used by JS (canvas proof export) is read from    */
+/* these custom properties via getComputedStyle, so changing the */
+/* tokens here also changes the exported images.                 */
+/* ============================================================= */
 
 :root {
-  /* Purple and cream colours */
+  /* --- Core palette (purple and cream) ----------------------- */
   --paper:   #f8fafc;   /* page background (light) */
   --surface: #ffffff;   /* panels and receipts */
   --wash:    #ede7fb;   /* soft purple fills */
@@ -13,27 +33,33 @@
   --muted:   #57537a;   /* secondary text */
   --accent:  #f5ebdd;   /* cream highlights */
 
-  /* Verdicts: always paired with a shape, word and pattern */
+  /* --- Verdict colours --------------------------------------- */
+  /* Always paired with a distinct shape + word + pattern, so    */
+  /* colour is never the only signal (colour-blind safe).        */
   --safe:    #3f7d12;
   --caution: #e0a82e;
   --danger:  #b3125a;
 
-  --scale: 1;
+  /* --- Typography & layout tokens ---------------------------- */
+  --scale: 1;                                          /* text-size multiplier, driven by settings */
   --font-body: "Atkinson Hyperlegible", system-ui, sans-serif;
   --font-display: "Bricolage Grotesque", "Atkinson Hyperlegible", system-ui, sans-serif;
   --leading: 1.6;
   --tracking: 0;
 }
 
-/* --- Accessibility settings (switched on by app.js) --- */
+/* --- Accessibility setting overrides (toggled by app.js) ---- */
+/* The easy-read font swaps every text element to Lexend. */
 html[data-easy-font] { --font-body: "Lexend", system-ui, sans-serif; --font-display: "Lexend", system-ui, sans-serif; }
+/* More space between lines and letters. */
 html[data-spacing]   { --leading: 1.95; --tracking: 0.03em; }
-/* Colour-blind theme: blue surf and sunkissed orange */
+/* Colour-blind theme: blue surf + sunkissed orange, with a neutral safe colour. */
 html[data-cb-palette] {
   --paper: #f6f8fb; --surface: #ffffff; --wash: #e3eaf4; --line: #8fa9cf;
   --mid: #3b5b8a; --deep: #1f3354; --ink: #16233a; --muted: #4b5a70; --accent: #f28b30;
   --safe: #3b5b8a; --caution: #f28b30; --danger: #1a1a1a;
 }
+/* High contrast: pure black text on white, with heavier borders. */
 html[data-contrast] {
   --paper: #ffffff; --surface: #ffffff; --wash: #ece8f6; --line: #000000;
   --mid: #3b1f8a; --deep: #120f33; --ink: #000000; --muted: #1b1b1b;
@@ -43,6 +69,7 @@ html[data-contrast] .panel,
 html[data-contrast] .example,
 html[data-contrast] .mode { border-width: 2px; border-color: #000; }
 
+/* Disable animations/transitions for users who prefer reduced motion. */
 html[data-reduce-motion] *,
 html[data-reduce-motion] *::before,
 html[data-reduce-motion] *::after {
@@ -51,11 +78,15 @@ html[data-reduce-motion] *::after {
   scroll-behavior: auto !important;
 }
 
-/* --- Base --- */
+/* --- Base / reset ------------------------------------------- */
 *, *::before, *::after { box-sizing: border-box; }
 * { margin: 0; }
 
-html { font-size: calc(100% * var(--scale)); scroll-behavior: smooth; scroll-padding-top: 84px; }
+html {
+  font-size: calc(100% * var(--scale));  /* scales with the text-size setting */
+  scroll-behavior: smooth;
+  scroll-padding-top: 84px;              /* leaves room for the sticky header */
+}
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 
 body {
@@ -70,27 +101,30 @@ body {
 h1, h2, h3 { font-family: var(--font-display); color: var(--deep); line-height: 1.12; letter-spacing: -0.01em; }
 h2 { font-size: clamp(1.6rem, 1.2rem + 1.6vw, 2.3rem); margin-bottom: 1rem; }
 h3 { font-size: 1.2rem; margin-bottom: 0.35rem; }
-p { max-width: 64ch; }
+p { max-width: 64ch; }                    /* keeps line length comfortable for reading */
 img, svg { display: block; }
 
 a { color: var(--mid); }
 
+/* Focus ring: purple by default, black + yellow halo in high contrast. */
 :focus-visible { outline: 3px solid var(--mid); outline-offset: 3px; border-radius: 6px; }
 html[data-contrast] :focus-visible { outline: 4px solid #000; box-shadow: 0 0 0 7px #ffd400; }
 
+/* Utility: hide visually but keep accessible to screen readers. */
 .visually-hidden {
   position: absolute !important; width: 1px; height: 1px; overflow: hidden;
   clip: rect(0 0 0 0); white-space: nowrap;
 }
 .hidden { display: none !important; }
 
+/* Skip link: appears when keyboard-focused so users can bypass the nav. */
 .skip-link {
   position: absolute; left: 1rem; top: -4rem; z-index: 100;
   background: var(--deep); color: #fff; padding: 0.6rem 1rem; border-radius: 8px;
 }
 .skip-link:focus { top: 1rem; }
 
-/* --- Buttons --- */
+/* --- Buttons ------------------------------------------------ */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
   min-height: 48px; padding: 0 1.3rem;
@@ -105,6 +139,7 @@ html[data-contrast] :focus-visible { outline: 4px solid #000; box-shadow: 0 0 0 
 .btn-quiet { background: transparent; color: var(--deep); border-color: var(--line); }
 .btn-quiet:hover { border-color: var(--deep); }
 
+/* Circular icon button (e.g. close, remove) — 44px meets touch target guidance. */
 .icon-btn {
   width: 44px; height: 44px; display: grid; place-items: center;
   border-radius: 50%; border: 2px solid var(--line); background: var(--surface);
@@ -112,7 +147,7 @@ html[data-contrast] :focus-visible { outline: 4px solid #000; box-shadow: 0 0 0 
 }
 .icon-btn svg { width: 20px; height: 20px; }
 
-/* --- Header --- */
+/* --- Header ------------------------------------------------- */
 .site-header {
   position: sticky; top: 0; z-index: 20;
   display: flex; align-items: center; gap: 1.5rem;
@@ -140,7 +175,7 @@ html[data-contrast] :focus-visible { outline: 4px solid #000; box-shadow: 0 0 0 
 }
 .access-btn svg { width: 22px; height: 22px; }
 
-/* --- Hero --- */
+/* --- Hero --------------------------------------------------- */
 .hero {
   max-width: 1160px; margin: 0 auto;
   display: grid; grid-template-columns: 1.05fr 1fr; gap: clamp(2rem, 5vw, 4rem); align-items: center;
@@ -156,7 +191,9 @@ html[data-contrast] :focus-visible { outline: 4px solid #000; box-shadow: 0 0 0 
 .lede { font-size: 1.15rem; color: var(--muted); margin-bottom: 2rem; max-width: 46ch; }
 .hero-actions { display: flex; flex-wrap: wrap; gap: 0.8rem; }
 
-/* The banknote */
+/* --- Banknote illustration --------------------------------- */
+/* The note has a hidden micro-text layer and lens that follow */
+/* the pointer, driven by --x/--y CSS variables set in JS.     */
 .note {
   position: relative;
   aspect-ratio: 5 / 3;
@@ -165,8 +202,8 @@ html[data-contrast] :focus-visible { outline: 4px solid #000; box-shadow: 0 0 0 
   background: var(--deep);
   color: #fff;
   box-shadow: 0 1px 0 var(--line), 0 24px 48px -28px var(--deep);
-  cursor: none;
-  --x: 70%; --y: 45%;
+  cursor: none;                /* hides the mouse cursor; the lens takes over */
+  --x: 70%; --y: 45%;          /* default lens position */
 }
 .note-pattern { position: absolute; inset: 0; width: 100%; height: 100%; }
 .note-content {
@@ -188,7 +225,7 @@ html[data-contrast] :focus-visible { outline: 4px solid #000; box-shadow: 0 0 0 
 }
 .note-stamp svg { width: 22px; height: 22px; color: var(--accent); }
 
-/* Hidden micro-text, only visible inside the lens */
+/* Micro-text layer: only visible inside a circular "lens" mask. */
 .note-micro {
   position: absolute; inset: 0;
   background: var(--wash); color: var(--deep);
@@ -208,6 +245,7 @@ html[data-contrast] :focus-visible { outline: 4px solid #000; box-shadow: 0 0 0 
   transition: opacity 0.2s, transform 0.25s;
   pointer-events: none;
 }
+/* The lens handle */
 .note-lens::after {
   content: ""; position: absolute; right: -30px; bottom: -30px;
   width: 44px; height: 10px; border-radius: 6px; background: #fff;
@@ -220,25 +258,26 @@ html[data-contrast] :focus-visible { outline: 4px solid #000; box-shadow: 0 0 0 
 }
 .note.is-checking .note-hint { opacity: 0; }
 
-/* Touch screens: no mouse, so show a still version */
+/* On touch devices there is no hover, so hide the hint and use the normal cursor. */
 @media (hover: none) {
   .note { cursor: auto; }
   .note-hint { display: none; }
 }
 
-/* --- How it works --- */
+/* --- How it works ------------------------------------------- */
 .how {
   max-width: 920px; margin: 0 auto;
   padding: clamp(3rem, 8vw, 6rem) clamp(1rem, 4vw, 2.5rem);
 }
 .steps { list-style: none; padding: 0; position: relative; display: grid; gap: clamp(2.5rem, 6vw, 4.5rem); counter-reset: step; }
+/* The vertical track with the animated coin. */
 .track {
   position: absolute; left: 22px; top: 8px; bottom: 8px; width: 4px;
   background: var(--wash); border-radius: 4px;
 }
 .track-fill {
   position: absolute; left: 0; top: 0; width: 100%;
-  height: calc(var(--p, 0) * 100%);
+  height: calc(var(--p, 0) * 100%);        /* --p is 0..1, set by scroll handler */
   background: var(--mid); border-radius: 4px;
 }
 .coin {
@@ -259,11 +298,12 @@ html[data-contrast] :focus-visible { outline: 4px solid #000; box-shadow: 0 0 0 
   transition: opacity 0.4s;
 }
 .step.is-reached { opacity: 1; }
+/* Uses CSS counters to prefix "1. ", "2. ", "3. " automatically. */
 .step h3::before { content: counter(step) ". "; color: var(--mid); }
 .step p { color: var(--muted); }
 .step-art { width: 160px; height: 120px; }
 
-/* --- Checker --- */
+/* --- Checker ------------------------------------------------ */
 .checker {
   max-width: 820px; margin: 0 auto clamp(3rem, 8vw, 5rem);
   padding: clamp(1.2rem, 3vw, 2rem);
@@ -281,6 +321,7 @@ html[data-contrast] :focus-visible { outline: 4px solid #000; box-shadow: 0 0 0 
   font: inherit; font-weight: 700;
 }
 
+/* Mode pills: the active one is filled dark, others stay light. */
 .modes { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
 .mode {
   display: inline-flex; align-items: center; gap: 0.45rem;
@@ -294,6 +335,7 @@ html[data-contrast] :focus-visible { outline: 4px solid #000; box-shadow: 0 0 0 
 .mode.active { background: var(--deep); border-color: var(--deep); color: #fff; }
 .mode.active svg { color: var(--accent); }
 
+/* The chat log: scrollable column of user messages and bot cards. */
 .chat {
   min-height: 300px; max-height: 60vh; overflow-y: auto;
   display: flex; flex-direction: column; gap: 0.9rem;
@@ -313,6 +355,7 @@ html[data-contrast] :focus-visible { outline: 4px solid #000; box-shadow: 0 0 0 
 .example svg { width: 24px; height: 24px; flex-shrink: 0; color: var(--mid); }
 .example:hover { border-color: var(--mid); }
 
+/* Message bubbles: right-aligned user, left-aligned bot. */
 .msg { max-width: min(88%, 560px); }
 .msg.user {
   align-self: flex-end;
@@ -323,7 +366,7 @@ html[data-contrast] :focus-visible { outline: 4px solid #000; box-shadow: 0 0 0 
 .msg.user img { max-width: 200px; width: 100%; border-radius: 10px; margin-bottom: 0.4rem; }
 .msg.bot { align-self: flex-start; width: min(100%, 560px); }
 
-/* --- Result cards (styled like paper receipts) --- */
+/* --- Result cards (styled like paper receipts) ------------- */
 .card {
   position: relative;
   background: var(--surface);
@@ -331,7 +374,7 @@ html[data-contrast] :focus-visible { outline: 4px solid #000; box-shadow: 0 0 0 
   border-top: 4px solid var(--mid);
   border-radius: 14px;
   padding: 1.2rem 1.2rem 1.1rem;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums;   /* numbers align in columns */
 }
 .card-label { font-size: 0.9rem; color: var(--muted); margin-bottom: 0.3rem; }
 .big { font-family: var(--font-display); font-size: clamp(1.8rem, 1.3rem + 2vw, 2.4rem); font-weight: 800; color: var(--deep); line-height: 1.1; }
@@ -340,6 +383,7 @@ html[data-contrast] :focus-visible { outline: 4px solid #000; box-shadow: 0 0 0 
 .text { line-height: var(--leading); }
 .note-small { margin-top: 0.6rem; font-size: 0.9rem; color: var(--muted); }
 
+/* Key/value rows separated by a dotted receipt-style rule. */
 .rows { margin-top: 0.9rem; }
 .row {
   display: flex; justify-content: space-between; gap: 1rem;
@@ -353,7 +397,8 @@ html[data-contrast] :focus-visible { outline: 4px solid #000; box-shadow: 0 0 0 
 .card ul { padding-left: 1.2rem; }
 .card li { margin-bottom: 0.3rem; }
 
-/* Verdict badges: shape + word + pattern */
+/* Verdict badges: each uses a distinct shape + border style + pattern,
+   so they remain distinguishable without colour. */
 .verdict {
   display: inline-flex; align-items: center; gap: 0.5rem;
   padding: 0.35rem 0.9rem 0.35rem 0.4rem;
@@ -369,16 +414,16 @@ html[data-contrast] :focus-visible { outline: 4px solid #000; box-shadow: 0 0 0 
   background: repeating-linear-gradient(-45deg, var(--danger) 0 8px, color-mix(in srgb, var(--danger) 78%, #000) 8px 16px);
 }
 .verdict.danger svg { color: #fff; }
-.verdict.danger svg { --icon-inner: var(--danger); }
+.verdict.danger svg { --icon-inner: var(--danger); }   /* lets the inner X match the fill */
 
-/* Visual bar comparing the offered rate with the real rate */
+/* Bar chart comparing the offered rate with the real rate. */
 .rate-bars { margin-top: 1rem; display: grid; gap: 0.5rem; }
 .rate-bar { display: grid; grid-template-columns: 7rem 1fr; align-items: center; gap: 0.6rem; font-size: 0.9rem; }
 .rate-bar .bar { height: 14px; border-radius: 7px; background: var(--wash); overflow: hidden; }
 .rate-bar .bar span { display: block; height: 100%; border-radius: 7px; background: var(--mid); }
 .rate-bar.offered .bar span { background: repeating-linear-gradient(-45deg, var(--muted) 0 6px, var(--ink) 6px 12px); }
 
-/* Loading dots */
+/* Loading indicator: three pulsing dots while a check runs. */
 .loading { display: flex; gap: 6px; padding: 1.2rem; }
 .loading::before { display: none; }
 .loading span { width: 9px; height: 9px; border-radius: 50%; background: var(--mid); animation: blink 1.2s infinite; }
@@ -386,6 +431,7 @@ html[data-contrast] :focus-visible { outline: 4px solid #000; box-shadow: 0 0 0 
 .loading span:nth-child(3) { animation-delay: 0.4s; }
 @keyframes blink { 0%, 80%, 100% { opacity: 0.2; } 40% { opacity: 1; } }
 
+/* "Read aloud" button appended by JS to each result card. */
 .speak-btn {
   display: inline-flex; align-items: center; gap: 0.4rem;
   margin-top: 0.8rem; min-height: 40px; padding: 0 0.9rem;
@@ -395,7 +441,7 @@ html[data-contrast] :focus-visible { outline: 4px solid #000; box-shadow: 0 0 0 
 }
 .speak-btn svg { width: 18px; height: 18px; }
 
-/* Photo preview */
+/* Photo preview thumbnail above the composer. */
 .image-preview { position: relative; display: inline-block; margin-top: 0.8rem; }
 .image-preview img { height: 76px; border-radius: 10px; border: 2px solid var(--line); }
 .image-preview button {
@@ -405,7 +451,7 @@ html[data-contrast] :focus-visible { outline: 4px solid #000; box-shadow: 0 0 0 
 }
 .image-preview button svg { width: 16px; height: 16px; }
 
-/* Message box */
+/* Composer: camera button, text field, submit button. */
 .composer { display: flex; gap: 0.5rem; align-items: center; margin-top: 0.8rem; }
 .upload-btn {
   width: 48px; height: 48px; flex-shrink: 0;
@@ -415,6 +461,7 @@ html[data-contrast] :focus-visible { outline: 4px solid #000; box-shadow: 0 0 0 
 }
 .upload-btn svg { width: 22px; height: 22px; }
 .upload-btn:focus-within { outline: 3px solid var(--mid); outline-offset: 3px; }
+/* 16px minimum font-size prevents iOS Safari from zooming on focus. */
 #messageInput {
   flex: 1; min-width: 0; min-height: 48px; padding: 0 1rem;
   border: 2px solid var(--line); border-radius: 999px;
@@ -423,7 +470,7 @@ html[data-contrast] :focus-visible { outline: 4px solid #000; box-shadow: 0 0 0 
 }
 #messageInput:focus { outline: 3px solid var(--mid); outline-offset: 2px; border-color: var(--mid); }
 
-/* --- Verdict key --- */
+/* --- Verdict key -------------------------------------------- */
 .key { max-width: 920px; margin: 0 auto; padding: 0 clamp(1rem, 4vw, 2.5rem) clamp(3rem, 8vw, 5rem); }
 .key-intro { color: var(--muted); margin-bottom: 1.4rem; }
 .key-list { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
@@ -440,15 +487,15 @@ html[data-contrast] :focus-visible { outline: 4px solid #000; box-shadow: 0 0 0 
 .key-item.danger { border-color: var(--danger); background: repeating-linear-gradient(-45deg, var(--surface) 0 10px, color-mix(in srgb, var(--danger) 7%, var(--surface)) 10px 20px); }
 .key-item.danger svg { color: var(--danger); }
 
-/* --- Footer --- */
+/* --- Footer ------------------------------------------------- */
 .site-footer { padding: 2rem clamp(1rem, 4vw, 2.5rem); border-top: 1px solid var(--wash); color: var(--muted); font-size: 0.9rem; text-align: center; }
 .site-footer p { margin: 0 auto; }
 
-/* --- Accessibility panel --- */
+/* --- Dialogs (accessibility + trust panel) ----------------- */
 .access-panel {
   width: min(440px, calc(100vw - 2rem));
   max-height: calc(100dvh - 2rem);
-  margin: auto 1rem auto auto;
+  margin: auto 1rem auto auto;   /* docked to the right edge */
   padding: 1.4rem;
   border: 2px solid var(--deep); border-radius: 20px;
   background: var(--surface); color: var(--ink);
@@ -458,6 +505,8 @@ html[data-contrast] :focus-visible { outline: 4px solid #000; box-shadow: 0 0 0 
 .panel-head h2 { margin: 0; font-size: 1.5rem; }
 .setting { border: 0; padding: 0; margin-bottom: 1rem; }
 .setting legend { font-weight: 700; margin-bottom: 0.5rem; }
+
+/* Segmented control for the text-size radios. */
 .segmented { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4rem; }
 .segmented label { position: relative; }
 .segmented input { position: absolute; opacity: 0; }
@@ -467,6 +516,8 @@ html[data-contrast] :focus-visible { outline: 4px solid #000; box-shadow: 0 0 0 
 }
 .segmented input:checked + span { background: var(--deep); border-color: var(--deep); color: #fff; }
 .segmented input:focus-visible + span { outline: 3px solid var(--mid); outline-offset: 2px; }
+
+/* Custom toggle switches built from checkboxes. */
 .toggle {
   display: flex; align-items: center; gap: 0.8rem;
   min-height: 52px; padding: 0.4rem 0;
@@ -487,7 +538,7 @@ html[data-contrast] :focus-visible { outline: 4px solid #000; box-shadow: 0 0 0 
 .toggle input:checked::after { transform: translateX(20px); background: #fff; }
 .reset-btn { margin-top: 1.2rem; width: 100%; }
 
-/* --- Tablets and phones --- */
+/* --- Responsive breakpoints --------------------------------- */
 @media (max-width: 900px) {
   .hero { grid-template-columns: 1fr; }
   .hero h1 { max-width: 18ch; }
@@ -509,7 +560,9 @@ html[data-contrast] :focus-visible { outline: 4px solid #000; box-shadow: 0 0 0 
   .mode { padding: 0 0.8rem; font-size: 0.95rem; }
 }
 
-/* --- Conversion card --- */
+/* --- Conversion card ---------------------------------------- */
+/* Two circular "coin chips" either side of an arrow, plus a    */
+/* currency selector and a swap button.                         */
 .convert-visual { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.9rem; }
 .coin-chip {
   display: grid; place-items: center;
@@ -526,7 +579,7 @@ html[data-contrast] :focus-visible { outline: 4px solid #000; box-shadow: 0 0 0 
 }
 .card-link:hover { background: var(--mid); }
 
-/* --- Compare section --- */
+/* --- Compare section ---------------------------------------- */
 .compare { max-width: 920px; margin: 0 auto; padding: 0 clamp(1rem, 4vw, 2.5rem) clamp(3rem, 8vw, 5rem); }
 .compare-intro { color: var(--muted); margin-bottom: 1.4rem; }
 .compare-panel {
@@ -544,6 +597,8 @@ html[data-contrast] :focus-visible { outline: 4px solid #000; box-shadow: 0 0 0 
 .field input:focus, .field select:focus { outline: 3px solid var(--mid); outline-offset: 2px; border-color: var(--mid); }
 .compare-note { font-size: 0.9rem; color: var(--muted); margin-bottom: 1rem; }
 
+/* Provider ranking list: best offer first, with a bar showing
+   how much of the "fair" amount each one delivers. */
 .providers { list-style: none; padding: 0; display: grid; gap: 0.6rem; }
 .provider {
   display: grid; grid-template-columns: 1.4fr 1fr 1.2fr; gap: 0.3rem 1rem; align-items: center;
@@ -574,8 +629,10 @@ html[data-contrast] :focus-visible { outline: 4px solid #000; box-shadow: 0 0 0 
   .provider-rate { grid-column: 1 / -1; grid-row: 2; }
 }
 
-/* --- Colour bands ---
-   Each part of the page sits on a full-width block of colour. */
+/* --- Colour bands ------------------------------------------- */
+/* Each major section sits on a full-width block of colour. The  */
+/* band tokens are redefined in the colour-blind and high-       */
+/* contrast themes so contrast is maintained everywhere.         */
 :root {
   --band-dark: #1e1b4b;     --on-dark: #ffffff;   --on-dark-muted: #ddd6fe;
   --band-bright: #f5ebdd;   --on-bright: #1e1b4b;
@@ -608,10 +665,10 @@ html[data-contrast] {
 .band-dark .lede, .band-dark .compare-intro { color: var(--on-dark-muted); }
 .band-dark :focus-visible, .site-header :focus-visible, .site-footer :focus-visible { outline-color: var(--band-bright); }
 
-/* White panels keep normal dark text, whatever band they sit on */
+/* White panels always use normal dark ink, whatever band they sit on. */
 .checker, .compare-panel, .card, .access-panel { color: var(--ink); }
 
-/* Header and footer */
+/* Header and footer always use the dark band palette. */
 .site-header { background: var(--band-dark); border-bottom: 1px solid color-mix(in srgb, var(--on-dark) 15%, transparent); backdrop-filter: none; }
 .logo { color: var(--on-dark); }
 .site-nav a { color: var(--on-dark); }
@@ -619,7 +676,7 @@ html[data-contrast] {
 .access-btn { background: var(--band-bright); color: var(--on-bright); border-color: var(--band-bright); }
 .site-footer { background: var(--band-dark); color: var(--on-dark-muted); border-top: 0; }
 
-/* Top section: cream button on indigo, soft purple banknote */
+/* Hero: cream button on indigo, soft purple banknote. */
 .band-dark .btn-primary { background: var(--band-bright); color: var(--on-bright); }
 .band-dark .btn-primary:hover { filter: brightness(1.08); background: var(--band-bright); }
 .band-dark .btn-quiet { color: var(--on-dark); border-color: var(--band-soft); }
@@ -635,18 +692,18 @@ html[data-contrast] {
 .note-lens { border-color: var(--on-soft); box-shadow: 0 0 0 2px #fff, 0 10px 24px rgba(0, 0, 0, 0.35); }
 .note-lens::after { background: var(--on-soft); }
 
-/* How it works on cream */
+/* How it works on cream. */
 .band-bright .step p { color: var(--on-bright); }
 .band-bright .step h3::before { color: var(--on-bright); }
 .band-bright .track { background: color-mix(in srgb, var(--on-bright) 18%, transparent); }
 .band-bright .track-fill { background: var(--on-bright); }
 .band-bright .coin { background: var(--band-dark); color: var(--band-bright); border-color: var(--band-dark); box-shadow: 0 0 0 6px var(--band-bright); }
 
-/* Checker on soft purple */
+/* Checker on soft purple. */
 .band-soft .checker { margin: 0 auto; border: 0; box-shadow: 0 30px 60px -35px var(--band-dark); }
 .band-soft { padding: clamp(2.5rem, 7vw, 5rem) 0; }
 
-/* Compare on indigo */
+/* Compare on indigo. */
 .band-dark .compare { padding-top: clamp(3rem, 8vw, 5rem); }
 .compare-panel { border: 0; }
 
@@ -656,11 +713,11 @@ html[data-contrast] {
 }
 .band-bright .step-art g > :first-child { stroke: var(--on-bright); stroke-width: 2.5; }
 
-/* Faded steps stay readable on coloured backgrounds */
+/* Faded steps stay readable on coloured backgrounds. */
 .band-bright .step { opacity: 0.72; }
 .band-bright .step.is-reached { opacity: 1; }
 
-/* --- Compare offers --- */
+/* --- Compare offers ----------------------------------------- */
 .real-rate { margin: 0.4rem 0 1.4rem; padding: 1rem 1.1rem; border-radius: 14px; background: var(--wash); }
 .real-rate-label { font-weight: 700; color: var(--muted); }
 .real-rate-amount { font-family: var(--font-display); font-weight: 800; font-size: clamp(1.6rem, 1.2rem + 1.6vw, 2.2rem); color: var(--deep); }
@@ -682,14 +739,14 @@ html[data-contrast] {
   .offer .field:first-child { grid-column: 1 / -1; }
   .offer-remove { grid-column: 2; justify-self: end; }
 }
-/* Keep form boxes inside their panel, and dark text on the white panel */
+/* Keep form boxes inside their panel, and dark text on the white panel. */
 .field input, .field select { width: 100%; min-width: 0; }
 .offer > *, .compare-form > * { min-width: 0; }
 .compare-panel h3 { color: var(--deep); }
 .compare-panel .btn-quiet { color: var(--deep); border-color: var(--line); }
 .compare-panel .btn-quiet:hover { border-color: var(--deep); }
 
-/* --- Ask someone you trust --- */
+/* --- "Ask someone you trust" button + dialog ---------------- */
 .trust-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 0.45rem;
   min-height: 42px; margin-top: 0.8rem; padding: 0 1rem;
@@ -714,7 +771,7 @@ html[data-contrast] {
 .trust-status { min-height: 1.5em; margin-top: 0.6rem; font-weight: 700; color: var(--mid); }
 @media (max-width: 420px) { .trust-actions { grid-template-columns: 1fr; } }
 
-/* --- Save a PayProoof and Good to know --- */
+/* --- "Save a PayProoof" button + "Good to know" notes ------- */
 .save-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 0.45rem;
   min-height: 42px; margin: 0.8rem 0.5rem 0 0; padding: 0 1rem;
@@ -726,7 +783,7 @@ html[data-contrast] {
 .save-btn svg { width: 18px; height: 18px; flex-shrink: 0; }
 .save-btn:hover { background: var(--deep); color: #fff; border-color: var(--deep); }
 
-/* On phones the two buttons sit one above the other at the same width */
+/* On phones the two buttons sit one above the other at the same width. */
 @media (max-width: 560px) {
   .save-btn, .trust-btn { display: flex; width: 100%; margin-right: 0; font-size: 0.9rem; min-height: 44px; }
 }
@@ -746,7 +803,7 @@ html[data-contrast] {
 .read-as { margin: 0 0 0.8rem; padding: 0.5rem 0.8rem; border-left: 4px solid var(--line); background: var(--paper); font-size: 0.9rem; color: var(--muted); }
 .msg.bot .card + .card { margin-top: 0.8rem; }
 
-/* --- Logo eyes: two of the o's in PayProoof --- */
+/* --- Logo eyes: two of the "o"s in PayProoof ---------------- */
 .wordmark { display: inline-flex; align-items: baseline; white-space: nowrap; }
 .eye {
   position: relative; display: inline-block;
@@ -756,6 +813,7 @@ html[data-contrast] {
   overflow: hidden;
   animation: eye-blink 6s infinite;
 }
+/* --px/--py are set inline by setUpEyes() to make the pupil follow the pointer. */
 .pupil {
   position: absolute; left: 50%; top: 50%;
   width: 0.3em; height: 0.3em; margin: -0.15em 0 0 -0.15em;
@@ -771,7 +829,7 @@ html[data-contrast] {
 @keyframes eye-blink { 0%, 95%, 100% { transform: scaleY(1); } 97% { transform: scaleY(0.1); } }
 html[data-contrast] .pupil { background: #000; }
 
-/* --- Compare: amount with its currency, and the swap button --- */
+/* --- Compare: amount with its currency, and the swap button - */
 .compare-form { grid-template-columns: 1fr auto 1fr; align-items: end; }
 .field > label { font-weight: 700; color: var(--muted); }
 .money-input { display: flex; min-width: 0; }
@@ -795,7 +853,7 @@ html[data-contrast] .pupil { background: #000; }
   .swap-btn svg { transform: rotate(90deg); }
 }
 
-/* --- Conversion card: change the currency or swap it round --- */
+/* --- Conversion card: change currency or swap round --------- */
 .convert-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-top: 0.9rem; }
 .convert-controls label { font-size: 0.9rem; font-weight: 700; color: var(--muted); }
 .convert-controls select {
@@ -813,7 +871,7 @@ html[data-contrast] .pupil { background: #000; }
 .convert-swap svg { width: 18px; height: 18px; }
 .convert-swap:hover { background: var(--deep); color: #fff; border-color: var(--deep); }
 
-/* Third o in the logo: a magnifying glass */
+/* Third "o" in the logo: a magnifying glass. */
 .lens {
   position: relative; display: inline-block;
   width: 0.62em; height: 0.62em; margin: 0 0.07em 0 0.12em;
@@ -836,7 +894,7 @@ html[data-contrast] .pupil { background: #000; }
 
 .provider-split { display: block; font-size: 0.8rem; color: var(--muted); }
 
-/* --- New chat button --- */
+/* --- New chat button ---------------------------------------- */
 .new-chat-btn {
   display: inline-flex; align-items: center; gap: 0.4rem;
   min-height: 44px; padding: 0 1rem;

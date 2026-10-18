@@ -4,20 +4,33 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PayProoof</title>
+
+  <!-- Preconnect to Google Fonts so the fonts load faster -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- Atkinson Hyperlegible: highly readable body font (great for accessibility)
+       Bricolage Grotesque: display font for headings and the logo
+       Lexend: optional "easy-read" font users can switch to -->
   <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Lexend:wght@400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css?v=20">
 </head>
 <body>
 
-  <!-- Icons: drawn once here, then reused across the page -->
+  <!-- ============================================================= -->
+  <!-- ICON SPRITE                                                   -->
+  <!-- All SVG icons are defined once here as <symbol> elements and  -->
+  <!-- reused anywhere with <use href="#id">. This keeps the DOM     -->
+  <!-- small and means icons inherit colour via currentColor.       -->
+  <!-- ============================================================= -->
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <!-- Brand mark: a banknote with a tick -->
     <symbol id="i-logo" viewBox="0 0 32 32"><rect x="2" y="6" width="28" height="20" rx="4" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M10 16.5l4 4 8-9" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <!-- Mode icons -->
     <symbol id="i-auto" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15.5 8.5l-2 5-5 2 2-5z" fill="currentColor"/></symbol>
     <symbol id="i-convert" viewBox="0 0 24 24"><path d="M4 8h14l-3-3M20 16H6l3 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-rate" viewBox="0 0 24 24"><path d="M4 17a8 8 0 1 1 16 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M12 17l4-6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="17" r="1.6" fill="currentColor"/></symbol>
     <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 5-3.2 8.4-7 10-3.8-1.6-7-5-7-10V6z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <!-- Utility icons -->
     <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
     <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
     <symbol id="i-access" viewBox="0 0 24 24"><circle cx="12" cy="4.5" r="2" fill="currentColor"/><path d="M5 8.5l7 1.5 7-1.5M12 10v5m0 0l-3 6m3-6l3 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
@@ -26,27 +39,37 @@
     <symbol id="i-swap" viewBox="0 0 24 24"><path d="M4 8h15m-4-4l4 4-4 4M20 16H5m4-4l-4 4 4 4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></symbol>
     <symbol id="i-sound" viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
-    <!-- Verdict shapes: each one is a different shape, not just a different colour -->
+    <!-- Verdict shapes: each one is a different shape, not just a different colour.
+         This ensures colour-blind users can tell the three verdicts apart. -->
     <symbol id="i-safe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="currentColor"/><path d="M7 12.5l3.2 3.2L17 9" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-caution" viewBox="0 0 24 24"><path d="M12 2.5L22.5 21h-21z" fill="currentColor"/><path d="M12 9v5" stroke="#1a1a1a" stroke-width="2.6" stroke-linecap="round"/><circle cx="12" cy="17.5" r="1.5" fill="#1a1a1a"/></symbol>
     <symbol id="i-danger" viewBox="0 0 24 24"><path d="M8 2h8l6 6v8l-6 6H8l-6-6V8z" fill="currentColor"/><path d="M8.5 8.5l7 7M15.5 8.5l-7 7" style="stroke: var(--icon-inner, #fff)" stroke-width="2.6" stroke-linecap="round"/></symbol>
   </svg>
 
+  <!-- Keyboard users can jump straight to the checker, bypassing the nav -->
   <a class="skip-link" href="#checker">Skip to the checker</a>
 
-  <!-- Header -->
+  <!-- ============================================================= -->
+  <!-- HEADER                                                        -->
+  <!-- ============================================================= -->
   <header class="site-header">
     <a class="logo" href="#top" aria-label="PayProoof home">
+      <!-- Base64 PNG of the brand mark so no extra network request is needed -->
       <img class="logo-mark" alt="" src="data:image/png;base64,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">
-      <!-- Two of the o's are eyes that follow the mouse, and the third is a magnifying glass -->
+      <!-- Wordmark: the two "o"s are animated eyes that follow the cursor,
+           and the third "o" is a magnifying-glass lens. Purely decorative
+           (aria-hidden) so screen readers just announce "PayProoof home". -->
       <span class="wordmark" aria-hidden="true">PayPr<span class="eye"><span class="pupil"></span></span><span class="eye"><span class="pupil"></span></span><span class="lens"></span>f</span>
     </a>
+
     <nav class="site-nav" aria-label="Main">
       <a href="#how">How it works</a>
       <a href="#compare">Compare</a>
       <a href="#key">Reading a result</a>
       <a href="#checker" class="nav-cta">Start a check</a>
     </nav>
+
+    <!-- Opens the accessibility settings dialog -->
     <button type="button" class="access-btn" id="accessBtn" aria-haspopup="dialog">
       <svg aria-hidden="true"><use href="#i-access"/></svg>
       <span>Accessibility</span>
@@ -55,11 +78,13 @@
 
   <main id="top">
 
-    <!-- Top section -->
+    <!-- ============================================================= -->
+    <!-- HERO — dark indigo band                                        -->
+    <!-- ============================================================= -->
     <div class="band band-dark">
     <section class="hero">
       <div class="hero-copy">
-                <h1>Before you make a payment, know how much it will actually cost.</h1>
+        <h1>Before you make a payment, know how much it will actually cost.</h1>
         <p class="lede">Paste a message, type an amount or snap a photo of a price. PayProoof converts it at the real rate, shows hidden exchange fees and spots the signs of a scam.</p>
         <div class="hero-actions">
           <a href="#checker" class="btn btn-primary">Start a check</a>
@@ -67,16 +92,20 @@
         </div>
       </div>
 
-      <!-- The banknote: move your mouse over it to check it's genuine -->
+      <!-- Banknote illustration: hover/focus over it to reveal the hidden
+           micro-text under a magnifying lens, simulating checking a note -->
       <figure class="note" id="note" aria-label="Illustration of a banknote being checked with a magnifying lens">
+        <!-- Security-style wavy line pattern drawn by JS (drawNotePattern) -->
         <svg class="note-pattern" id="notePattern" viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" aria-hidden="true"></svg>
         <div class="note-content" aria-hidden="true">
+          <!-- Amount is populated with the live rate by updateNoteRate() -->
           <span class="note-amount" id="noteAmount">£300.00</span>
           <span class="note-line" id="noteLine">Loading today's real rate</span>
           <span class="note-stamp">
             <svg><use href="#i-safe"/></svg> Checked
           </span>
         </div>
+        <!-- Hidden micro-text revealed only inside the lens -->
         <div class="note-micro" aria-hidden="true"></div>
         <div class="note-lens" aria-hidden="true"></div>
         <figcaption class="note-hint">Move over the note to check it</figcaption>
@@ -84,13 +113,18 @@
     </section>
     </div>
 
-    <!-- How it works: the coin moves down as you scroll -->
+    <!-- ============================================================= -->
+    <!-- HOW IT WORKS — cream band, with a coin that travels down as    -->
+    <!-- the user scrolls (driven by updateScrollEffect in app.js)      -->
+    <!-- ============================================================= -->
     <div class="band band-bright">
     <section class="how" id="how" aria-labelledby="how-title">
       <h2 id="how-title">How it works</h2>
       <ol class="steps" id="steps">
+        <!-- Decorative vertical track + animated coin -->
         <li class="track" aria-hidden="true"><span class="track-fill" id="trackFill"></span><span class="coin" id="coin">£</span></li>
 
+        <!-- Step 1 -->
         <li class="step">
           <svg class="step-art" viewBox="0 0 160 120" aria-hidden="true">
             <rect x="48" y="8" width="64" height="104" rx="10" fill="var(--paper)" stroke="var(--deep)" stroke-width="3"/>
@@ -102,10 +136,11 @@
           </svg>
           <div>
             <h3>Show it what you're looking at</h3>
-            <p>Type an amount, paste a payment request, or take a photo of a price, a bill or an exchange-rate board.</p>
+            <p>You can take a picture of a price, bill, or exchange rate board, type an amount, or paste a payment request</p>
           </div>
         </li>
 
+        <!-- Step 2 -->
         <li class="step">
           <svg class="step-art" viewBox="0 0 160 120" aria-hidden="true">
             <rect x="20" y="30" width="96" height="16" rx="8" fill="var(--line)"/>
@@ -120,6 +155,7 @@
           </div>
         </li>
 
+        <!-- Step 3: shows the three verdict shapes -->
         <li class="step">
           <svg class="step-art" viewBox="0 0 160 120" aria-hidden="true">
             <g transform="translate(14 38)"><circle cx="20" cy="20" r="20" fill="var(--safe)"/><path d="M10 21l7 7 13-14" fill="none" stroke="#fff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/></g>
@@ -135,11 +171,16 @@
     </section>
     </div>
 
-    <!-- The checker -->
+    <!-- ============================================================= -->
+    <!-- CHECKER — soft purple band, contains the chat-style UI          -->
+    <!-- ============================================================= -->
     <div class="band band-soft">
     <section class="checker" id="checker" aria-labelledby="checker-title">
       <div class="checker-head">
         <h2 id="checker-title">Check a payment</h2>
+
+        <!-- The user's home currency: used as the default target for
+             conversions and shown on the banknote illustration -->
         <label class="home-currency">
           <span>My currency</span>
           <select id="homeCurrency">
@@ -165,11 +206,16 @@
             <option value="ZAR">ZAR, South African rand</option>
           </select>
         </label>
+
+        <!-- Clears the chat history and shows the example buttons again -->
         <button type="button" class="new-chat-btn" id="newChat">
           <svg aria-hidden="true"><use href="#i-plus"/></svg>New chat
         </button>
       </div>
 
+      <!-- Mode selector: the active mode determines how the input is analysed.
+           Role=radiogroup so assistive tech announces these as exclusive
+           options rather than plain buttons. -->
       <div class="modes" role="radiogroup" aria-label="What do you want to check?">
         <button type="button" class="mode active" data-mode="auto" role="radio" aria-checked="true">
           <svg aria-hidden="true"><use href="#i-auto"/></svg> Work it out for me
@@ -185,7 +231,10 @@
         </button>
       </div>
 
+      <!-- Chat log: aria-live=polite means new results are announced
+           to screen readers without interrupting the user -->
       <div id="chat" class="chat" role="log" aria-live="polite" aria-label="Your checks">
+        <!-- Welcome panel: shown initially, removed after the first check -->
         <div id="welcome" class="welcome">
           <p>Try one of these, or type your own below.</p>
           <div class="examples">
@@ -205,6 +254,7 @@
         </div>
       </div>
 
+      <!-- Preview of any attached photo, with a remove button -->
       <div id="imagePreview" class="image-preview hidden">
         <img id="previewImg" alt="The photo you attached">
         <button type="button" id="removeImage" aria-label="Remove photo">
@@ -212,6 +262,7 @@
         </button>
       </div>
 
+      <!-- Composer: camera upload, text input and submit button -->
       <form id="composer" class="composer">
         <label class="upload-btn" title="Add a photo">
           <svg aria-hidden="true"><use href="#i-camera"/></svg>
@@ -225,7 +276,11 @@
     </section>
     </div>
 
-    <!-- Compare offers -->
+    <!-- ============================================================= -->
+    <!-- COMPARE OFFERS — dark indigo band                               -->
+    <!-- Lets the user type in multiple offers and rank them against     -->
+    <!-- the real mid-market rate.                                       -->
+    <!-- ============================================================= -->
     <div class="band band-dark">
     <section class="compare" id="compare" aria-labelledby="compare-title">
       <h2 id="compare-title">Compare before you send</h2>
@@ -236,6 +291,7 @@
             <label for="compareAmount">You send</label>
             <div class="money-input">
               <input type="number" id="compareAmount" value="1000" min="1" step="any" inputmode="decimal">
+              <!-- Currency lists are populated by fillCompareCurrencies() -->
               <select id="compareFrom" aria-label="Currency you send"></select>
             </div>
           </div>
@@ -249,22 +305,27 @@
           </label>
         </form>
 
+        <!-- Shows how much the recipient would get at the real rate, no fees -->
         <div class="real-rate" id="realRate" aria-live="polite"></div>
 
         <h3 class="offers-title">Offers you've been given</h3>
         <p class="compare-note">Find the rate and fee in your bank app, on an exchange desk board, or on a provider's website.</p>
+        <!-- Offer rows are added dynamically by addOffer() in app.js -->
         <div class="offers" id="offers"></div>
         <div class="offer-actions">
           <button type="button" class="btn btn-quiet" id="addOffer">Add another offer</button>
           <a class="btn btn-quiet" id="wiseCompareLink" href="https://wise.com" target="_blank" rel="noopener">See Wise's price</a>
         </div>
 
+        <!-- Rendered offer ranking cards appear here -->
         <div id="compareResults" aria-live="polite"></div>
       </div>
     </section>
     </div>
 
-    <!-- Reading a result: explains the shapes, for visual learners and colour-blind users -->
+    <!-- ============================================================= -->
+    <!-- VERDICT KEY — explains the three shapes to the user             -->
+    <!-- ============================================================= -->
     <div class="band band-light">
     <section class="key" id="key" aria-labelledby="key-title">
       <h2 id="key-title">Reading a result</h2>
@@ -291,7 +352,11 @@
     <p>PayProoof is a quick safety check, not financial advice. Exchange rates are mid-market rates from Frankfurter.</p>
   </footer>
 
-  <!-- Ask someone you trust -->
+  <!-- ============================================================= -->
+  <!-- "ASK SOMEONE YOU TRUST" DIALOG                                  -->
+  <!-- Provides pre-written share messages to WhatsApp / SMS / email   -->
+  <!-- so a user can get a second opinion before paying.               -->
+  <!-- ============================================================= -->
   <dialog id="trustPanel" class="access-panel trust-panel" aria-labelledby="trust-title">
     <div class="panel-head">
       <h2 id="trust-title">Ask someone you trust</h2>
@@ -312,7 +377,12 @@
     <p class="trust-status" id="trustStatus" role="status"></p>
   </dialog>
 
-  <!-- Accessibility settings panel -->
+  <!-- ============================================================= -->
+  <!-- ACCESSIBILITY SETTINGS DIALOG                                   -->
+  <!-- Controls text size, fonts, spacing, contrast, colour-blind      -->
+  <!-- theme, reduced motion and auto read-aloud. Persisted in        -->
+  <!-- localStorage so choices survive across visits.                  -->
+  <!-- ============================================================= -->
   <dialog id="accessPanel" class="access-panel" aria-labelledby="access-title">
     <div class="panel-head">
       <h2 id="access-title">Accessibility</h2>
@@ -330,6 +400,7 @@
       </div>
     </fieldset>
 
+    <!-- Each toggle has a data-setting key that app.js reads directly -->
     <label class="toggle"><input type="checkbox" data-setting="easyFont"> <span>Easy-read font</span></label>
     <label class="toggle"><input type="checkbox" data-setting="spacing"> <span>More space between lines and letters</span></label>
     <label class="toggle"><input type="checkbox" data-setting="contrast"> <span>High contrast</span></label>
@@ -340,7 +411,11 @@
     <button type="button" class="btn btn-quiet reset-btn" id="resetAccess">Reset to default</button>
   </dialog>
 
-  <!-- Free photo reader that runs in the browser -->
+  <!-- ============================================================= -->
+  <!-- SCRIPTS                                                         -->
+  <!-- Tesseract.js reads text from photos entirely in the browser,    -->
+  <!-- so no image ever leaves the device.                            -->
+  <!-- ============================================================= -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <script src="app.js?v=20"></script>
 </body>

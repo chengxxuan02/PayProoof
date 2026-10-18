@@ -1,8 +1,22 @@
-// PayProoof
-// This file makes the page work: it reads what the user types or photographs,
-// gets the real exchange rate, checks for scam warning signs and shows the result.
+// =============================================================
+// PayProoof — application logic
+//
+// This single file powers the page:
+//   • reads what the user types (or photographs),
+//   • fetches real mid-market exchange rates (Frankfurter API),
+//   • checks the message for scam warning signs (regex rules),
+//   • renders a result card with a verdict badge,
+//   • lets the user save an image of the result or send it
+//     to someone they trust,
+//   • manages accessibility settings and small visual effects.
+//
+// No data is ever sent to a PayProoof server: everything happens
+// in the browser. The only network calls are to Frankfurter
+// (exchange rates) and jsDelivr (the Tesseract OCR script).
+// =============================================================
 
-// --- Find the parts of the page we need ---
+// --- DOM references ----------------------------------------
+// Cached once so we don't look them up on every interaction.
 const chat = document.getElementById('chat');
 const welcome = document.getElementById('welcome');
 const form = document.getElementById('composer');
@@ -15,9 +29,10 @@ const homeSelect = document.getElementById('homeCurrency');
 const modeButtons = document.querySelectorAll('.mode');
 
 let currentMode = 'auto';
-let currentImage = null; // the attached photo
+let currentImage = null; // Base64 data URL of the currently attached photo
 
-// Hint text in the message box for each mode
+// Placeholder text shown in the message box for each mode,
+// so users get an example of the format that mode expects.
 const PLACEHOLDERS = {
   auto: 'Type an amount, a rate or paste a message',
   convert: 'For example: How much is €250?',
@@ -25,9 +40,9 @@ const PLACEHOLDERS = {
   scam: 'Paste the message or payment request here',
 };
 
-// ===== The checker =====
+// ===== MODE SELECTION =====
 
-// --- Mode buttons ---
+// The four mode pills behave like radio buttons: only one active.
 modeButtons.forEach((btn) => {
   btn.addEventListener('click', () => {
     modeButtons.forEach((b) => {
@@ -42,7 +57,9 @@ modeButtons.forEach((btn) => {
   });
 });
 
-// --- Example buttons ---
+// --- Example buttons ---------------------------------------
+// Pre-filled examples in the welcome panel; clicking one fills
+// the input and immediately submits the form.
 document.querySelectorAll('.example').forEach((btn) => {
   btn.addEventListener('click', () => {
     input.value = btn.dataset.text;
@@ -50,8 +67,10 @@ document.querySelectorAll('.example').forEach((btn) => {
   });
 });
 
-// --- Photo upload ---
-// Phone photos are very big, so we shrink them first to make reading them faster
+// --- Photo upload ------------------------------------------
+// Phone photos can be 5–10 MB. Down-scaling to ≤1600px on the
+// longest edge keeps OCR fast and keeps sessionStorage within
+// its quota when the chat is saved.
 imageInput.addEventListener('change', () => {
   const file = imageInput.files[0];
   if (!file) return;
@@ -75,14 +94,16 @@ imageInput.addEventListener('change', () => {
 
 removeImageBtn.addEventListener('click', clearImage);
 
-// Removes the attached photo
+// Resets the attached photo and hides the preview thumbnail.
 function clearImage() {
   currentImage = null;
   imageInput.value = '';
   preview.classList.add('hidden');
 }
 
-// --- When the user presses Check ---
+// --- Form submission ---------------------------------------
+// The main entry point: runs a check, shows a loading state,
+// then swaps in the result card.
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
   const text = input.value.trim();
@@ -92,6 +113,7 @@ form.addEventListener('submit', async (event) => {
     return;
   }
 
+  // Remove the welcome panel once the user starts chatting.
   if (welcome && welcome.isConnected) welcome.remove();
   addUserMessage(text, image);
   input.value = '';
@@ -100,7 +122,7 @@ form.addEventListener('submit', async (event) => {
   const loading = addLoading();
   try {
     const result = await analyse(text, image);
-    result.userText = text;
+    result.userText = text;            // stored so the scam card can quote it
     const html = await renderResult(result);
     loading.remove();
     addBotCard(html);
@@ -112,18 +134,21 @@ form.addEventListener('submit', async (event) => {
   saveChat();
 });
 
-// ===== Keeping your chat =====
-// Your checks stay in this tab, even if you refresh, until you press New chat
-// or close the tab. Nothing is sent anywhere: it's stored in your own browser.
+// ===== CHAT PERSISTENCE =====
+// The chat is kept in sessionStorage so a page refresh doesn't
+// lose the user's work. It's cleared when the tab is closed, or
+// when they press "New chat". Nothing leaves the browser.
+
 const CHAT_KEY = 'payprooof-chat';
 
-// Saves the chat so it's still there after a refresh
+// Serialises the chat HTML plus the saved proof records.
 function saveChat() {
   const data = { html: chat.innerHTML, proofs: [...savedProofs], count: proofCount };
   try {
     sessionStorage.setItem(CHAT_KEY, JSON.stringify(data));
   } catch {
-    // Photos can make the chat too big to store, so try again without them
+    // Photos make the payload too big — retry with image tags replaced
+    // by a short note so the rest of the conversation still survives.
     try {
       data.html = data.html.replace(/<img[^>]*>/g, '<p class="note-small">Photo not kept after refresh</p>');
       sessionStorage.setItem(CHAT_KEY, JSON.stringify(data));
@@ -131,24 +156,24 @@ function saveChat() {
   }
 }
 
-// Brings back the chat after a refresh
+// Rebuilds the chat DOM and the savedProofs map from storage.
 function restoreChat() {
   let data = null;
   try { data = JSON.parse(sessionStorage.getItem(CHAT_KEY)); } catch { /* nothing saved */ }
   if (!data || !data.html) return;
   chat.innerHTML = data.html;
   (data.proofs || []).forEach(([id, record]) => {
-    record.checkedAt = new Date(record.checkedAt);
+    record.checkedAt = new Date(record.checkedAt);  // dates are stored as ISO strings
     savedProofs.set(id, record);
   });
   proofCount = data.count || 0;
-  // The Read aloud buttons need setting up again
+  // Speak buttons are re-attached because the originals were lost with the HTML.
   chat.querySelectorAll('.speak-btn').forEach((btn) => btn.remove());
   chat.querySelectorAll('.card').forEach(addSpeakButton);
   scrollDown();
 }
 
-// New chat: clears your checks and shows the examples again
+// New chat: clears all messages and restores the welcome panel.
 document.getElementById('newChat').addEventListener('click', () => {
   window.speechSynthesis?.cancel();
   chat.innerHTML = '';
@@ -157,13 +182,15 @@ document.getElementById('newChat').addEventListener('click', () => {
   input.focus();
 });
 
-// ===== Understanding the message =====
+// ===== ANALYSIS =====
 
-// Works out what the user wants and returns the result to show
+// Runs the appropriate check for the chosen mode, using the
+// current home currency as the default conversion target.
 async function analyse(text, image) {
   const homeCurrency = homeSelect.value;
 
-  // If there's a photo, read the text in it and check that text too
+  // If a photo is attached, OCR it and append that text to whatever
+  // the user typed, so both can contribute to the check.
   if (image) {
     const photoText = await readPhotoText(image);
     if (!photoText && !text) {
@@ -174,8 +201,8 @@ async function analyse(text, image) {
   return localAnalyse(text, homeCurrency, currentMode);
 }
 
-// Reads the text in a photo. Tesseract downloads its reading data the first
-// time, so the first photo takes a few seconds longer.
+// Lazily creates a single Tesseract worker so repeated photos don't
+// re-download language data. First call may take a few seconds.
 let photoReader = null;
 async function readPhotoText(image) {
   if (!window.Tesseract) return '';
@@ -189,9 +216,10 @@ async function readPhotoText(image) {
   }
 }
 
-// --- Choosing which check to run ---
-
-// Decides which check to run: scam check, rate check or conversion
+// --- Choosing which check to run ---------------------------
+// Decides between scam check, rate check and conversion, and
+// combines them when both a scam signal and a rate signal are
+// present (so a scam warning is never hidden).
 function localAnalyse(text, home, mode) {
   const scamReasons = SCAM_RULES.filter((rule) => rule.re.test(text)).map((rule) => rule.reason);
   const rateOffer = parseRateOffer(text);
@@ -202,9 +230,11 @@ function localAnalyse(text, home, mode) {
     verdict: scamReasons.length === 0 ? 'safe' : scamReasons.length === 1 ? 'caution' : 'danger',
     reasons: scamReasons,
   };
-  // A scam warning is never hidden: if warning signs are found, that check is shown too
+  // A scam warning is never hidden: if warning signs are found, show both checks.
   const withScamCheck = (main) => (scamReasons.length ? { type: 'both', results: [scam, main] } : main);
 
+  // Builds a "convert" result from the first amount found. Target is
+  // whichever currency is named after "in/to/into", or the home currency.
   const makeConvert = () => {
     if (!amounts.length) return null;
     const first = amounts[0];
@@ -229,19 +259,19 @@ function localAnalyse(text, home, mode) {
     return scamReasons.length ? scam : askAnything;
   }
 
-  // "Work it out for me"
+  // "Work it out for me": try rate → scam → convert, in that order.
   if (rateOffer) return withScamCheck(rateOffer);
   if (scamReasons.length) return scam;
   return makeConvert() || askAnything;
 }
 
-// --- Understanding currencies in normal writing ---
+// ===== CURRENCY PARSING =====
 
-// Currencies the live rate service supports
+// Currencies the live rate service (Frankfurter) supports.
 const SUPPORTED = ['AED', 'AUD', 'BRL', 'CAD', 'CHF', 'CNY', 'EUR', 'GBP', 'HKD', 'INR',
   'JPY', 'MXN', 'MYR', 'PHP', 'SAR', 'SEK', 'SGD', 'THB', 'USD', 'ZAR'];
 
-// Words and symbols people use for each currency
+// Maps the words and symbols people actually type to ISO currency codes.
 const CURRENCY_WORDS = {
   '£': 'GBP', pound: 'GBP', pounds: 'GBP', gbp: 'GBP', quid: 'GBP', sterling: 'GBP',
   '€': 'EUR', euro: 'EUR', euros: 'EUR', eur: 'EUR',
@@ -259,37 +289,40 @@ const CURRENCY_WORDS = {
   aud: 'AUD', cad: 'CAD', sgd: 'SGD', hkd: 'HKD', mxn: 'MXN',
 };
 
-// Turns a word or symbol like "euros" or "€" into a currency code like EUR
+// Normalises a token to an ISO code, or null if not recognised.
+// Only 3-letter codes in UPPERCASE are accepted, so the English word
+// "try" isn't mistaken for Turkish lira.
 function toCode(token) {
   if (!token) return null;
   const word = token.toLowerCase();
   if (CURRENCY_WORDS[word]) return CURRENCY_WORDS[word];
-  // Only accept a 3-letter code in capitals, so the word "try" isn't read as Turkish lira
   if (token === token.toUpperCase() && SUPPORTED.includes(token)) return token;
   return null;
 }
 
-// Reads numbers written in different styles: 1,234.56 / 1.234,56 / 12,50 / 1.02
+// Parses numbers with either "." or "," as decimal separators
+// (and handles thousands separators). Returns NaN for unparseable.
 function toNum(s) {
   let t = String(s);
   const lastDot = t.lastIndexOf('.');
   const lastComma = t.lastIndexOf(',');
   if (lastDot > -1 && lastComma > -1) {
-    // Both appear: whichever comes last is the decimal point
+    // Both present — whichever appears last is the decimal point.
     const decimal = lastDot > lastComma ? '.' : ',';
     const thousands = decimal === '.' ? ',' : '.';
     t = t.split(thousands).join('').replace(decimal, '.');
   } else if (lastComma > -1) {
-    // Only commas: "1,234" is a thousand, "12,50" is a decimal
+    // Only commas: "1,234" is a thousand; "12,50" is a decimal.
     t = /^\d{1,3}(,\d{3})+$/.test(t) ? t.replace(/,/g, '') : t.replace(',', '.');
   } else if ((t.match(/\./g) || []).length > 1) {
-    // "1.234.567" uses dots for thousands
+    // Multiple dots mean dots are thousands separators.
     t = t.replace(/\./g, '');
   }
   return parseFloat(t);
 }
 
-// Finds amounts like "£300", "250 euros" or "EUR 40"
+// Finds all amounts in the text in one of three common forms:
+// "£300", "250 euros" / "EUR 40". Results are sorted by position.
 function findAmounts(text) {
   const found = [];
   for (const m of text.matchAll(/([£€$¥₹₱])\s?(\d(?:[\d.,]*\d)?)/g)) {
@@ -306,7 +339,8 @@ function findAmounts(text) {
   return found.sort((a, b) => a.index - b.index);
 }
 
-// Finds the currency to convert into: "in pounds", "to USD", "into euros"
+// Finds a target currency named after "in", "into" or "to"
+// e.g. "250 euros in pounds" → GBP. Returns null if none found.
 function findTarget(text) {
   for (const m of text.matchAll(/\b(?:in|into|to)\s+([A-Za-zł£€$¥₹₱]+)/gi)) {
     const code = toCode(m[1]);
@@ -315,23 +349,24 @@ function findTarget(text) {
   return null;
 }
 
-// Finds an exchange rate someone was offered, e.g. "1.02 euros per pound"
+// Parses an offered exchange rate in several natural-language forms.
+// Returns a structured "rate_check" object, or null if nothing matches.
 function parseRateOffer(text) {
   let offeredRate = null, from = null, to = null, matched = '';
 
-  // "1.02 euros per pound", "1.02 EUR for each GBP"
+  // Form 1: "1.02 euros per pound", "1.02 EUR for each GBP"
   for (const m of text.matchAll(/(\d+(?:\.\d+)?)\s*([A-Za-z€$£¥₹₱]+)\s*(?:per|for each|for every|for one|for a|for 1|to the|to a|to 1|=)\s*(?:1\s*)?([A-Za-z€$£¥₹₱]+)/gi)) {
     const t = toCode(m[2]), f = toCode(m[3]);
     if (t && f && t !== f) { offeredRate = toNum(m[1]); to = t; from = f; matched = m[0]; break; }
   }
 
-  // "£1 = €1.05" or "1 GBP = 1.05 EUR"
+  // Form 2: "£1 = €1.05" or "1 GBP = 1.05 EUR"
   if (!offeredRate) {
     const m = text.match(/([£€$¥₹₱]|[A-Z]{3})\s?1\s*=\s*([£€$¥₹₱]|[A-Z]{3})?\s?(\d+(?:\.\d+)?)\s*([A-Z]{3})?/);
     if (m) { from = toCode(m[1]); to = toCode(m[2] || m[4]); offeredRate = toNum(m[3]); matched = m[0]; }
   }
 
-  // "1 pound = 0.98 euro", "1 GBP = 1.10 EUR", "1 pound gets you 1.05 euros"
+  // Form 3: "1 pound = 0.98 euro", "1 GBP = 1.10 EUR", "1 pound gets you 1.05 euros"
   if (!offeredRate) {
     const m = text.match(/\b1\s*([A-Za-z€$£¥₹₱]+)\s*(?:=|is|gets?(?: you)?|buys?)\s*([€$£¥₹₱])?\s?(\d+(?:\.\d+)?)\s*([A-Za-z]+)?/i);
     if (m) {
@@ -340,7 +375,7 @@ function parseRateOffer(text) {
     }
   }
 
-  // "rate of 1.05" + "£300 to euros"
+  // Form 4: "rate of 1.05" combined with a later amount ("£300 to euros")
   if (!offeredRate) {
     const m = text.match(/rate\s*(?:of|is|:)?\s*(\d+(?:\.\d+)?)/i);
     const amounts = findAmounts(text.replace(m ? m[0] : '', ' '));
@@ -349,21 +384,24 @@ function parseRateOffer(text) {
     }
   }
 
+  // If either side is missing or they're the same, this isn't a rate offer.
   if (!offeredRate || !from || !to || from === to) return null;
 
   let rest = text.replace(matched, ' ');
-  // Remove other lines of a rate board ("GBP 1 = USD 1.18") so they aren't read as the amount
+  // Remove other lines of a rate board ("GBP 1 = USD 1.18") so they aren't
+  // read as the amount the user is exchanging.
   rest = rest.replace(/(?:[£€$¥₹₱]|[A-Z]{3})\s?1\s*=\s*(?:[£€$¥₹₱]|[A-Z]{3})?\s?\d+(?:\.\d+)?(?:\s*[A-Z]{3})?/g, ' ');
   const feeInfo = parseFee(rest);
-  // Remove the fee so it isn't mistaken for the amount
+  // Remove the fee text so it isn't mistaken for the amount.
   if (feeInfo.value) rest = rest.replace(/\d+(?:\.\d+)?\s?%\s*(?:fee|commission|charge)|(?:fee|commission|charge)\s*(?:of\s*)?\d+(?:\.\d+)?\s?%|(?:fee|commission|charge)[^\d,;.%]{0,12}?\d+(?:\.\d+)?|[£€$¥₹₱]?\d+(?:\.\d+)?\s*(?:pounds?|euros?|dollars?)?\s*(?:fee|commission)/i, ' ');
   const amounts = findAmounts(rest);
   const inFrom = amounts.find((a) => a.currency === from);
   const inTo = amounts.find((a) => a.currency === to);
-  let amount = 100;
+  let amount = 100;                        // sensible fallback
   if (inFrom) amount = inFrom.value;
   else if (inTo) amount = inTo.value / offeredRate;
 
+  // Convert a percentage fee into an absolute amount in the "from" currency.
   const fee = feeInfo.percent ? (amount * feeInfo.value) / 100 : feeInfo.value;
   return {
     type: 'rate_check', amount, from, to, offeredRate, fee,
@@ -372,9 +410,10 @@ function parseRateOffer(text) {
   };
 }
 
-// Finds a fee: either an amount ("£5 fee") or a percentage ("2% fee")
+// Detects a fee mentioned in the text — either a flat amount
+// ("£5 fee") or a percentage ("2% fee"). Returns { value, percent }.
 function parseFee(text) {
-  // "No commission", "zero fees", "fee-free" mean no fee
+  // Explicit "no fee" / "fee-free" counts as zero.
   if (/\b(?:no|zero|0%?)\s+(?:fees?|commission)|(?:fee|commission)[- ]free/i.test(text)) return { value: 0, percent: false };
   const pct = text.match(/(\d+(?:\.\d+)?)\s?%\s*(?:fee|commission|charge)/i)
     || text.match(/(?:fee|commission|charge)\s*(?:of\s*)?(\d+(?:\.\d+)?)\s?%/i);
@@ -384,9 +423,11 @@ function parseFee(text) {
   return { value: m ? toNum(m[1]) : 0, percent: false };
 }
 
-// --- Scam warning signs ---
+// ===== SCAM DETECTION =====
+// Each rule is a regex paired with a plain-English explanation
+// shown to the user. Rules are intentionally simple (no ML) so the
+// behaviour is transparent and easy to audit or extend.
 
-// Each rule is a pattern to look for, and the reason it's a warning sign
 const SCAM_RULES = [
   { re: /urgent|immediately|right now|today only|within \d* ?hours?|asap|last chance/i,
     reason: "Pressure to pay quickly. Scammers rush you so you don't stop to check." },
@@ -410,15 +451,15 @@ const SCAM_RULES = [
     reason: '"New number" family message. A common impersonation scam.' },
 ];
 
-// Gets the real exchange rate between two currencies from Frankfurter
+// Fetches the live mid-market rate between two currencies.
+// Tries the v2 endpoint first, then falls back to v1 if needed.
+// Whichever answer is more recent wins, so an old rate is never used.
 async function getRate(from, to) {
   if (from === to) return { rate: 1, date: new Date().toISOString(), source: 'none' };
   if (!SUPPORTED.includes(from) || !SUPPORTED.includes(to)) {
     throw new Error(`Unsupported currency: ${from} or ${to}`);
   }
 
-  // Frankfurter: today's rates first, then the European Central Bank feed as a backup.
-  // We keep whichever answer is most recent, so an old rate is never used by mistake.
   const answers = [];
   try {
     const res = await fetch(`https://api.frankfurter.dev/v2/rates?base=${from}&quotes=${to}`);
@@ -444,22 +485,24 @@ async function getRate(from, to) {
   return { ...answers[0], source: 'Frankfurter' };
 }
 
-// ===== Result cards =====
+// ===== RESULT RENDERING =====
 
-// Makes sure a verdict is one of: safe, caution or danger
+// Coerces verdict synonyms ("green", "amber", "red") to canonical
+// values, and falls back to "caution" for anything unexpected.
 function normaliseVerdict(v) {
   return { green: 'safe', amber: 'caution', red: 'danger' }[v] || (['safe', 'caution', 'danger'].includes(v) ? v : 'caution');
 }
 
-// Which icon goes with each verdict
+// Maps each verdict to its SVG symbol id.
 const VERDICT_ICON = { safe: 'i-safe', caution: 'i-caution', danger: 'i-danger' };
 
-// The coloured label at the top of a result, with its shape
+// The coloured (and shaped) label shown at the top of result cards.
 function verdictBadge(verdict, label) {
   return `<span class="verdict ${verdict}"><svg aria-hidden="true"><use href="#${VERDICT_ICON[verdict]}"/></svg>${label}</span>`;
 }
 
-// Picks the right card to show for each type of result
+// Dispatches to the right card renderer based on result.type.
+// "both" renders two cards stacked vertically.
 async function renderResult(result) {
   switch (result.type) {
     case 'convert': return renderConvert(result);
@@ -474,13 +517,13 @@ async function renderResult(result) {
   }
 }
 
-// Link that opens the same conversion on Wise's website
+// Deep-link to the same conversion on Wise so the user can compare.
 function wiseLink(from, to, amount) {
   const url = `https://wise.com/gb/currency-converter/${from.toLowerCase()}-to-${to.toLowerCase()}-rate?amount=${Math.round(amount * 100) / 100}`;
   return `<a class="card-link" href="${url}" target="_blank" rel="noopener">See this conversion on Wise</a>`;
 }
 
-// --- Convert ---
+// --- Convert card ------------------------------------------
 async function renderConvert({ amount, from, to }) {
   const { rate, date, source } = await getRate(from, to);
   const converted = amount * rate;
@@ -520,7 +563,8 @@ async function renderConvert({ amount, from, to }) {
     </div>`;
 }
 
-// Redraws a conversion card in place with new currencies
+// Re-renders a conversion card in place when the user changes the
+// target currency or presses the swap button.
 async function updateConvertCard(card, amount, from, to) {
   try {
     const holder = document.createElement('div');
@@ -535,6 +579,7 @@ async function updateConvertCard(card, amount, from, to) {
   }
 }
 
+// Event delegation on the chat log handles currency changes and swaps.
 chat.addEventListener('change', (e) => {
   const select = e.target.closest('.convert-to');
   if (select) updateConvertCard(select.closest('.card'), parseFloat(select.dataset.amount), select.dataset.from, select.value);
@@ -544,11 +589,12 @@ chat.addEventListener('click', (e) => {
   if (btn) updateConvertCard(btn.closest('.card'), parseFloat(btn.dataset.amount), btn.dataset.from, btn.dataset.to);
 });
 
-// --- Rate check ---
+// --- Rate check card ---------------------------------------
 async function renderRate({ amount, from, to, offeredRate, fee = 0, feePercent = null, amountGuessed = false }) {
   const { rate: realRate, date, source } = await getRate(from, to);
 
   // If the rate looks upside down (e.g. 0.87 instead of 1.15), flip it
+  // and let the user know we did.
   let note = '';
   const ratio = offeredRate / realRate;
   if ((ratio < 0.5 || ratio > 1.5) && Math.abs(1 / offeredRate / realRate - 1) < 0.5) {
@@ -562,6 +608,7 @@ async function renderRate({ amount, from, to, offeredRate, fee = 0, feePercent =
   const lossInFrom = lossInTo / realRate;
   const percent = (lossInTo / shouldGet) * 100;
 
+  // Verdict thresholds: <1% is fair, 1–3% is pricey, >3% is a rip-off.
   const verdict = percent < 1 ? 'safe' : percent < 3 ? 'caution' : 'danger';
   const labels = { safe: 'Fair rate', caution: 'Check first: pricey', danger: 'Stop: rip-off rate' };
   const rateNotes = [
@@ -576,6 +623,9 @@ async function renderRate({ amount, from, to, offeredRate, fee = 0, feePercent =
   };
 
   const feeText = fee ? `, with a ${money(fee, from)} fee${feePercent ? `, which is ${feePercent}% of the amount` : ''}` : ', with no fee';
+
+  // A pre-filled message for the "Ask someone you trust" button, so
+  // the user doesn't need to explain the situation themselves.
   return `
     <div class="card">
       ${verdictBadge(verdict, labels[verdict])}
@@ -619,10 +669,12 @@ async function renderRate({ amount, from, to, offeredRate, fee = 0, feePercent =
     </div>`;
 }
 
-// --- Scam check ---
+// --- Scam check card ---------------------------------------
 function renderScam({ verdict, reasons = [], advice, userText = '' }) {
   verdict = normaliseVerdict(verdict);
   const labels = { safe: 'No warning signs found', caution: 'Check first', danger: "Stop: don't send this money" };
+
+  // Default advice for each verdict — used unless the caller supplies its own.
   const defaultAdvice = {
     safe: [
       "None of the common warning signs PayProoof looks for were found. This doesn't prove the person or the payment is genuine.",
@@ -641,6 +693,9 @@ function renderScam({ verdict, reasons = [], advice, userText = '' }) {
     ],
   };
   const steps = advice && advice.length ? advice : defaultAdvice[verdict];
+
+  // Skip generic "before you pay" advice when it's a clear scam — the
+  // specific instructions are more important.
   const beforeYouPay = verdict === 'danger' ? [] : BEFORE_YOU_PAY;
   const forThisSituation = situationTips(userText);
 
@@ -673,16 +728,15 @@ function renderScam({ verdict, reasons = [], advice, userText = '' }) {
     </div>`;
 }
 
-// How many days old a rate is
+// Number of whole days between a date and now (used to warn about stale rates).
 function daysOld(date) {
   const d = new Date(date);
   return isNaN(d) ? 999 : Math.floor((Date.now() - d.getTime()) / 86400000);
 }
 
-// ===== Good to know =====
-// Honest notes shown under every result, so nobody is misled
+// ===== "GOOD TO KNOW" NOTES =====
 
-// Note about where the rate comes from, with a warning if it's old
+// Note describing the source and age of a rate; adds a warning if >4 days old.
 const RATE_NOTE = (source, date) => {
   const age = daysOld(date);
   const warning = age > 4
@@ -691,7 +745,8 @@ const RATE_NOTE = (source, date) => {
   return `Rates come from ${source}, which publishes reference rates from central banks once each working day, so they don't move minute by minute like the rates on Google or in banking apps. This one is from ${formatDate(date)}.${warning}`;
 };
 
-// Advice checked against Take Five to Stop Fraud, UK Finance, GOV.UK and Which? in October 2026
+// Universal advice shown on scam cards. Sourced from Take Five to
+// Stop Fraud, UK Finance, GOV.UK and Which? (checked October 2026).
 const BEFORE_YOU_PAY = [
   "Take a moment. It's OK to refuse or ignore a request for money. Someone genuine won't rush or panic you.",
   "When you pay by bank transfer, your bank checks the name against the account. If it says the name doesn't match, don't pay until you've contacted the person yourself, and be wary of anyone who tells you to ignore it.",
@@ -701,7 +756,7 @@ const RENT_TIP = 'Renting in England? Your landlord or letting agent must put yo
 const BUY_TIP = "Buying something? Paying by credit card for something that costs over £100 and up to £30,000 can give you extra protection under Section 75 of the Consumer Credit Act. This doesn't apply to debit cards.";
 const ADVICE_SOURCE = 'Advice is based on guidance from Take Five to Stop Fraud, UK Finance, GOV.UK and Which?, checked in October 2026.';
 
-// Extra advice that only appears when the message is about renting or buying
+// Adds context-specific extra tips when the message is about renting or buying.
 function situationTips(text = '') {
   const tips = [];
   if (/\b(deposit|rent|renting|flat|room|landlord|tenan\w*|letting|lease|viewing|property)\b/i.test(text)) tips.push(RENT_TIP);
@@ -709,26 +764,28 @@ function situationTips(text = '') {
   return tips;
 }
 
-// Shows a heading with a list of advice under it
+// Renders a titled list of advice items. Returns '' if the list is empty.
 function adviceList(title, items) {
   return items.length ? `<h3>${title}</h3><ul>${items.map((s) => `<li>${escapeHtml(s)}</li>`).join('')}</ul>` : '';
 }
 
-// Reminder that the scam check can't catch everything
+// A standing disclaimer about the limits of the scam check.
 const SCAM_NOTE = 'This check looks for common warning signs. It can miss new kinds of scams and can flag genuine messages, so always confirm with the person or company directly before you pay.';
 
-// The "Good to know" box under each result
+// Renders the "Good to know" box under each result card.
 function goodToKnow(notes) {
   return `<div class="good-to-know"><strong>Good to know</strong><ul>${notes.map((n) => `<li>${escapeHtml(n)}</li>`).join('')}</ul></div>`;
 }
 
-// ===== Save a PayProoof =====
-// Turns a result into an image the user can keep as a record
+// ===== "SAVE A PAYPROOOF" =====
+// Renders the current result as a PNG image the user can keep.
+// Everything is drawn with the Canvas 2D API — no external libs.
 
-const savedProofs = new Map();
+const savedProofs = new Map();   // id → record
 let proofCount = 0;
 
-// Remembers what's in a result and adds the Save button for it
+// Registers a record and returns the button HTML for it. The button
+// carries the record id so the click handler can look it up later.
 function saveButton(record) {
   proofCount += 1;
   record.checkedAt = new Date();
@@ -737,6 +794,7 @@ function saveButton(record) {
     <svg aria-hidden="true"><use href="#i-save"/></svg>Save a PayProoof</button>`;
 }
 
+// The Save button exists in both the chat and the comparison section.
 [chat, document.getElementById('compareResults')].forEach((area) => {
   area.addEventListener('click', (e) => {
     const btn = e.target.closest('.save-btn');
@@ -744,7 +802,8 @@ function saveButton(record) {
   });
 });
 
-// Splits text into lines that fit a width
+// Splits a string into lines that fit within `maxWidth` when rendered
+// in the current canvas font. Used to wrap text inside the PNG.
 function wrapText(ctx, text, maxWidth) {
   const words = String(text).split(/\s+/);
   const lines = [];
@@ -762,7 +821,7 @@ function wrapText(ctx, text, maxWidth) {
   return lines;
 }
 
-// Draws the verdict shape: circle, triangle or octagon
+// Draws the verdict icon (circle / triangle / octagon) with its inner mark.
 function drawVerdictShape(ctx, verdict, x, y, size, colour) {
   ctx.fillStyle = colour;
   ctx.beginPath();
@@ -774,6 +833,7 @@ function drawVerdictShape(ctx, verdict, x, y, size, colour) {
     ctx.lineTo(x + size, y + size);
     ctx.lineTo(x, y + size);
   } else {
+    // Regular octagon
     for (let i = 0; i < 8; i++) {
       const a = Math.PI / 8 + (i * Math.PI) / 4;
       ctx.lineTo(x + r + r * Math.cos(a), y + r + r * Math.sin(a));
@@ -782,7 +842,7 @@ function drawVerdictShape(ctx, verdict, x, y, size, colour) {
   ctx.closePath();
   ctx.fill();
 
-  // The mark inside each shape: a tick, an exclamation mark or a cross
+  // Inner mark: tick, exclamation mark or cross.
   ctx.lineWidth = size * 0.12;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
@@ -808,10 +868,14 @@ function drawVerdictShape(ctx, verdict, x, y, size, colour) {
   ctx.stroke();
 }
 
-// Draws the saved PayProoof image
+// Renders a saved proof record into a fully laid-out canvas.
+// The layout is measured first (to compute total height), then drawn.
 function drawProof(record) {
   const css = getComputedStyle(document.documentElement);
   const col = (name, fallback) => css.getPropertyValue(name).trim() || fallback;
+
+  // Pull colours from the CSS custom properties so the export
+  // matches whatever accessibility theme the user has active.
   const dark = col('--band-dark', '#1e1b4b');
   const bright = col('--band-bright', '#f5ebdd');
   const ink = col('--ink', '#1b1838');
@@ -825,7 +889,7 @@ function drawProof(record) {
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
 
-  // Work out every line first, so we know how tall the image needs to be
+  // --- Build a list of logical blocks, then measure each one.
   const blocks = [];
   const add = (type, text, size, weight = 400, colour = ink, gap = 10) => blocks.push({ type, text, size, weight, colour, gap });
   const when = record.checkedAt.toLocaleString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -835,6 +899,7 @@ function drawProof(record) {
   if (record.headline) add('text', record.headline, 40, 700, ink, 24);
   (record.rows || []).forEach(([label, value]) => blocks.push({ type: 'row', label, value, gap: 4 }));
   if (record.rows && record.rows.length) blocks.push({ type: 'space', h: 20 });
+
   if (record.reasons) {
     add('heading', 'Warning signs found', 30, 700, ink, 8);
     (record.reasons.length ? record.reasons : ['None of the common warning signs were found.']).forEach((r) => add('bullet', r, 26, 400, ink, 6));
@@ -854,9 +919,11 @@ function drawProof(record) {
     s.items.forEach((item) => add('bullet', item, 26, 400, ink, 6));
     blocks.push({ type: 'space', h: 16 });
   });
+
+  // Always include the standing disclaimer, then any card-specific notes.
   blocks.push({ type: 'notes', notes: ['PayProoof is a quick check, not financial or legal advice.', ...(record.notes || [])] });
 
-  // Measure
+  // --- Measure total height so the canvas can be sized correctly.
   const lineH = (size) => Math.round(size * 1.4);
   let height = 170 + P;
   const prepared = blocks.map((b) => {
@@ -883,7 +950,7 @@ function drawProof(record) {
   canvas.width = W;
   canvas.height = height;
 
-  // Background and header
+  // --- Draw the background and header bar.
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, W, height);
   ctx.fillStyle = dark;
@@ -898,6 +965,7 @@ function drawProof(record) {
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
 
+  // --- Draw each prepared block sequentially.
   let y = 140 + 60;
   prepared.forEach((b) => {
     if (b.type === 'text' || b.type === 'heading') {
@@ -956,7 +1024,7 @@ function drawProof(record) {
   return canvas;
 }
 
-// Downloads the image, or opens the share menu on phones
+// Triggers the browser's share sheet (mobile) or file download (desktop).
 function downloadProof(record) {
   if (!record) return;
   const canvas = drawProof(record);
@@ -965,11 +1033,12 @@ function downloadProof(record) {
   const stamp = `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}-${pad(t.getHours())}${pad(t.getMinutes())}`;
   canvas.toBlob((blob) => {
     const file = new File([blob], `payprooof-${stamp}.png`, { type: 'image/png' });
-    // On phones, offer the share menu so it can go straight to Photos or Files
+    // On phones, prefer the native share sheet (save to Photos, etc.).
     if (navigator.canShare && navigator.canShare({ files: [file] }) && matchMedia('(hover: none)').matches) {
       navigator.share({ files: [file], title: 'My PayProoof' }).catch(() => {});
       return;
     }
+    // On desktop, trigger a regular download.
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = file.name;
@@ -978,15 +1047,16 @@ function downloadProof(record) {
   }, 'image/png');
 }
 
-// ===== Ask someone you trust =====
+// ===== "ASK SOMEONE YOU TRUST" =====
 
-// The "Ask someone you trust" button, with the message ready to send
+// The "Ask someone you trust" button. The message is embedded in a
+// data attribute and read back by the panel handler below.
 function trustButton(message) {
   return `<button type="button" class="trust-btn" data-share="${escapeHtml(message)}">
     <svg aria-hidden="true"><use href="#i-people"/></svg>Ask someone you trust</button>`;
 }
 
-// Writes the message to send after a scam check
+// Builds a shareable text describing a scam check outcome.
 function scamShareText(verdict, label, reasons, userText) {
   const quoted = userText ? `\n\nThe message says:\n"${userText.length > 400 ? `${userText.slice(0, 400)}…` : userText}"` : '';
   const signs = reasons.length ? `\n\nWarning signs it found:\n${reasons.map((r) => `- ${r}`).join('\n')}` : '';
@@ -998,7 +1068,7 @@ const trustMessage = document.getElementById('trustMessage');
 const trustStatus = document.getElementById('trustStatus');
 const trustShareBtn = document.getElementById('trustShare');
 
-// Keeps the WhatsApp, text and email links matching the message
+// Keeps the WhatsApp / SMS / email deep links in sync with the textarea.
 function updateTrustLinks() {
   const text = trustMessage.value;
   const encoded = encodeURIComponent(text);
@@ -1007,11 +1077,12 @@ function updateTrustLinks() {
   document.getElementById('trustEmail').href = `mailto:?subject=${encodeURIComponent('Can you check this before I pay?')}&body=${encoded}`;
 }
 
-// Opens the panel for sending the message
+// Opens the trust dialog pre-filled with the given message.
 function openTrust(message) {
   trustMessage.value = message;
   trustStatus.textContent = '';
   updateTrustLinks();
+  // Only show the native share button if the browser supports it.
   trustShareBtn.classList.toggle('hidden', !navigator.share);
   trustPanel.showModal();
 }
@@ -1022,6 +1093,7 @@ chat.addEventListener('click', (e) => {
 });
 trustMessage.addEventListener('input', updateTrustLinks);
 document.getElementById('closeTrust').addEventListener('click', () => trustPanel.close());
+// Clicking the backdrop (but not the panel itself) closes the dialog.
 trustPanel.addEventListener('click', (e) => {
   if (e.target === trustPanel) trustPanel.close();
 });
@@ -1031,6 +1103,7 @@ document.getElementById('trustCopy').addEventListener('click', async () => {
     await navigator.clipboard.writeText(trustMessage.value);
     trustStatus.textContent = 'Copied. Paste it into any app to send it.';
   } catch {
+    // Clipboard API unavailable — fall back to manual selection.
     trustMessage.select();
     trustStatus.textContent = 'Press Ctrl+C (or long-press and Copy) to copy the message.';
   }
@@ -1040,18 +1113,19 @@ trustShareBtn.addEventListener('click', async () => {
   try {
     await navigator.share({ title: 'Can you check this before I pay?', text: trustMessage.value });
   } catch {
-    // The person closed the share menu
+    // The user closed the share sheet — nothing to do.
   }
 });
 
-// Shows a date like "17 October 2026"
+// Formats a date as "17 October 2026" (UK style).
 function formatDate(date) {
   const d = new Date(date);
   return isNaN(d) ? '' : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
-// ===== Compare offers =====
-// Every number here is either the live real rate or something the user typed.
+// ===== COMPARE OFFERS =====
+// Lets the user type in multiple provider offers and rank them by
+// how much the recipient actually receives.
 
 const compareAmount = document.getElementById('compareAmount');
 const compareTo = document.getElementById('compareTo');
@@ -1060,10 +1134,11 @@ const realRateBox = document.getElementById('realRate');
 const offersBox = document.getElementById('offers');
 const compareResults = document.getElementById('compareResults');
 const wiseCompareLink = document.getElementById('wiseCompareLink');
-let compareTimer = null;
+let compareTimer = null;    // used to debounce input
 let offerCount = 0;
 
-// Fills both currency lists. Sending starts as "My currency" but can be anything.
+// Populates the "from" and "to" currency dropdowns. The "from" list
+// shows bare codes; the "to" list includes full names.
 function fillCompareCurrencies(from = compareFrom.value || homeSelect.value) {
   const previous = compareTo.value;
   let names = null;
@@ -1077,12 +1152,14 @@ function fillCompareCurrencies(from = compareFrom.value || homeSelect.value) {
     .map((code) => `<option value="${code}">${code}${names ? `, ${names.of(code)}` : ''}</option>`)
     .join('');
 
+  // Try to keep the previously selected "to" currency; otherwise fall
+  // back to EUR or GBP so there's always a valid pair.
   const fallback = from === 'EUR' ? 'GBP' : 'EUR';
   compareTo.value = previous && previous !== from ? previous : fallback;
   updateOfferLabels();
 }
 
-// Adds a row where the user types one offer
+// Adds an empty offer row to the UI with input listeners attached.
 function addOffer(name = '') {
   offerCount += 1;
   const id = offerCount;
@@ -1114,7 +1191,8 @@ function addOffer(name = '') {
   return row;
 }
 
-// Shows the right currencies in each row's labels, e.g. "Their rate (1 GBP = ? EUR)"
+// Updates the per-row labels to reflect the current currencies, so
+// users know what units to enter (e.g. "Their rate: 1 GBP = how many EUR").
 function updateOfferLabels() {
   const from = compareFrom.value;
   const to = compareTo.value;
@@ -1122,7 +1200,8 @@ function updateOfferLabels() {
   offersBox.querySelectorAll('.fee-label').forEach((el) => { el.textContent = `Their fee in ${from}`; });
 }
 
-// Works out what each offer gives and shows them from best to worst
+// The main compare computation: fetches the real rate, computes each
+// offer's value, sorts best → worst, and renders the ranking.
 async function updateCompare() {
   const from = compareFrom.value;
   const to = compareTo.value;
@@ -1151,25 +1230,30 @@ async function updateCompare() {
     <div class="real-rate-amount">${money(fair, to)}</div>
     <div class="sub">1 ${from} = ${real.rate.toFixed(4)} ${to}. Live mid-market rate from ${real.source}, ${formatDate(real.date)}.</div>`;
 
-  // Read the offers the user has typed
+  // Read what the user typed into each offer row.
   const offers = [];
   offersBox.querySelectorAll('.offer').forEach((row, i) => {
     let rate = parseFloat(row.querySelector('.offer-rate').value);
     const fee = parseFloat(row.querySelector('.offer-fee').value) || 0;
     const name = row.querySelector('.offer-name').value.trim() || `Offer ${i + 1}`;
     if (!(rate > 0)) return;
-    // If a rate looks upside down (e.g. 0.87 instead of 1.15), flip it
+
+    // Auto-correct an upside-down rate (e.g. 0.87 → 1.15).
     let flipped = false;
     if (Math.abs(rate / real.rate - 1) > 0.5 && Math.abs(1 / rate / real.rate - 1) < 0.5) {
       rate = 1 / rate;
       flipped = true;
     }
+
     const received = Math.max(0, amount - fee) * rate;
     const loss = Math.max(0, fair - received);
     const percent = (loss / fair) * 100;
-    // Split the loss into the part from a worse rate and the part from the fee
+
+    // Split the loss into "worse rate" vs "fee" so users know where
+    // the money is going. Percentages are relative to the fair amount.
     const ratePercent = Math.max(0, ((real.rate - rate) / real.rate) * 100);
     const feePercent = (fee / amount) * 100;
+
     offers.push({ name, rate, fee, received, loss, percent, flipped, ratePercent, feePercent });
   });
 
@@ -1178,6 +1262,7 @@ async function updateCompare() {
     return;
   }
 
+  // Rank highest received amount first.
   offers.sort((a, b) => b.received - a.received);
   const labels = { safe: 'Fair', caution: 'Pricey', danger: 'Rip-off' };
   const compareNotes = [
@@ -1225,7 +1310,8 @@ async function updateCompare() {
     ${goodToKnow(compareNotes)}`;
 }
 
-// Wait until the user stops typing before updating
+// Debounced input handler — waits 350ms after the last keystroke
+// before recalculating so we don't spam the rate API.
 function scheduleCompare() {
   clearTimeout(compareTimer);
   compareTimer = setTimeout(updateCompare, 350);
@@ -1248,7 +1334,7 @@ compareFrom.addEventListener('change', () => {
   fillCompareCurrencies(compareFrom.value);
   updateCompare();
 });
-// Swap: what you send becomes what they receive, and the other way round
+// Swap button: what you send becomes what they receive, and vice versa.
 document.getElementById('compareSwap').addEventListener('click', () => {
   const oldFrom = compareFrom.value;
   const oldTo = compareTo.value;
@@ -1258,18 +1344,18 @@ document.getElementById('compareSwap').addEventListener('click', () => {
   updateCompare();
 });
 
-// Start with two empty offers to fill in
+// Seed the UI with two empty offer rows.
 addOffer();
 addOffer();
 
-// ===== Helpers =====
+// ===== CHAT UI HELPERS =====
 
-// A simple card with a message in it
+// A simple card with a plain message — used for errors and prompts.
 function messageCard(text) {
   return `<div class="card"><p class="text">${escapeHtml(text)}</p></div>`;
 }
 
-// Shows what the user sent, on the right
+// Appends the user's message bubble (with optional photo) to the chat.
 function addUserMessage(text, image) {
   const div = document.createElement('div');
   div.className = 'msg user';
@@ -1278,22 +1364,23 @@ function addUserMessage(text, image) {
   scrollDown();
 }
 
-// Shows a result card in the chat
+// Appends a bot card and wires up any interactive elements inside it.
 function addBotCard(html) {
   const div = document.createElement('div');
   div.className = 'msg bot';
   div.innerHTML = html;
 
-  // Every result gets a "Read aloud" button
+  // Each card gets its own "Read aloud" button.
   const cards = [...div.querySelectorAll('.card')];
   cards.forEach(addSpeakButton);
 
   chat.appendChild(div);
   scrollDown();
+  // Auto-speak if the user enabled "Read results aloud".
   if (settings.readAloud && cards.length) speak(cards.map(cardText).join(' '));
 }
 
-// Adds a "Read aloud" button to a result card
+// Adds a "Read aloud" button that speaks the card's visible text.
 function addSpeakButton(card) {
   if (!('speechSynthesis' in window)) return;
   const btn = document.createElement('button');
@@ -1304,7 +1391,7 @@ function addSpeakButton(card) {
   card.appendChild(btn);
 }
 
-// Shows the loading dots while a check runs
+// A temporary "thinking" indicator shown while a check runs.
 function addLoading() {
   const div = document.createElement('div');
   div.className = 'msg bot';
@@ -1314,19 +1401,20 @@ function addLoading() {
   return div;
 }
 
-// Scrolls the chat to the newest message
+// Scrolls the chat container to the bottom so the newest message is visible.
 function scrollDown() {
   chat.scrollTop = chat.scrollHeight;
 }
 
-// The text of a card, without the button labels
+// Extracts the visible text from a card, minus button labels and
+// aria-hidden content — used as input for speech synthesis.
 function cardText(card) {
   const copy = card.cloneNode(true);
   copy.querySelectorAll('button').forEach((b) => b.remove());
   return copy.innerText.replace(/\s+/g, ' ').trim();
 }
 
-// Reads text out loud using the browser's voice
+// Reads the given text aloud using the browser's speech synthesis.
 function speak(text) {
   if (!('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
@@ -1335,7 +1423,8 @@ function speak(text) {
   window.speechSynthesis.speak(utterance);
 }
 
-// Shows a number as money, like £12.50
+// Formats a number as a currency string (e.g. £12.50), falling back to
+// a simple "12.50 GBP" if the currency code isn't supported.
 function money(value, currency) {
   try {
     return new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format(value);
@@ -1344,7 +1433,8 @@ function money(value, currency) {
   }
 }
 
-// Makes text safe to put on the page
+// Escapes user-provided text before interpolating into HTML.
+// Critical for any value that ultimately ends up in innerHTML.
 function escapeHtml(str) {
   return String(str)
     .replace(/&/g, '&amp;')
@@ -1353,12 +1443,15 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
-// ===== Accessibility settings =====
-// Saved in the browser so they stay the same next time
+// ===== ACCESSIBILITY SETTINGS =====
+// User preferences are stored in localStorage so they persist
+// between visits. Each toggle maps to a `data-...` attribute on
+// <html> that style.css reacts to.
 
 const root = document.documentElement;
 const panel = document.getElementById('accessPanel');
-// Settings when nothing has been changed yet
+
+// Defaults used when nothing is stored or a setting has been reset.
 const DEFAULTS = {
   textSize: '1',
   easyFont: false,
@@ -1370,7 +1463,7 @@ const DEFAULTS = {
 };
 let settings = loadSettings();
 
-// Loads saved settings from the browser
+// Merges saved settings over the defaults.
 function loadSettings() {
   try {
     const saved = JSON.parse(localStorage.getItem('payprooof-access') || '{}');
@@ -1380,7 +1473,7 @@ function loadSettings() {
   }
 }
 
-// Saves settings in the browser
+// Writes the current settings back to localStorage.
 function saveSettings() {
   try {
     localStorage.setItem('payprooof-access', JSON.stringify(settings));
@@ -1389,14 +1482,15 @@ function saveSettings() {
   }
 }
 
-// Turns settings into data-... attributes on <html>, which style.css reacts to
+// Reflects the current settings into the DOM and into the dialog's
+// form controls so the UI always shows the correct state.
 function applySettings() {
   root.style.setProperty('--scale', settings.textSize);
   ['easyFont', 'spacing', 'contrast', 'cbPalette', 'reduceMotion'].forEach((key) => {
     if (settings[key]) root.dataset[key] = '';
     else delete root.dataset[key];
   });
-  // Keep the panel's switches in sync
+  // Keep the panel's switches in sync.
   panel.querySelectorAll('[data-setting]').forEach((box) => {
     box.checked = !!settings[box.dataset.setting];
   });
@@ -1406,15 +1500,18 @@ function applySettings() {
   updateScrollEffect();
 }
 
+// Wire up the checkbox-style toggles.
 panel.querySelectorAll('[data-setting]').forEach((box) => {
   box.addEventListener('change', () => {
     settings[box.dataset.setting] = box.checked;
+    // Turning off auto read-aloud should also stop any in-progress speech.
     if (box.dataset.setting === 'readAloud' && !box.checked) window.speechSynthesis?.cancel();
     applySettings();
     saveSettings();
   });
 });
 
+// Wire up the text-size radio group.
 panel.querySelectorAll('input[name="textSize"]').forEach((radio) => {
   radio.addEventListener('change', () => {
     settings.textSize = radio.value;
@@ -1423,23 +1520,26 @@ panel.querySelectorAll('input[name="textSize"]').forEach((radio) => {
   });
 });
 
+// Reset button: restore every setting to its default.
 document.getElementById('resetAccess').addEventListener('click', () => {
   settings = { ...DEFAULTS };
   applySettings();
   saveSettings();
 });
 
+// Open/close the accessibility dialog.
 document.getElementById('accessBtn').addEventListener('click', () => panel.showModal());
 document.getElementById('closeAccess').addEventListener('click', () => panel.close());
-// Clicking the dark area outside the panel closes it
+// Clicking the dark area outside the panel closes it.
 panel.addEventListener('click', (e) => {
   if (e.target === panel) panel.close();
 });
 
-// ===== Visual effects =====
+// ===== VISUAL EFFECTS =====
 
-// --- Banknote pattern ---
-// Fine swirling lines, like the security printing on real notes
+// --- Banknote security pattern -----------------------------
+// Draws fine wavy lines and two intersecting rosettes inside the
+// SVG element, mimicking the security printing on real notes.
 function drawNotePattern() {
   const svg = document.getElementById('notePattern');
   const ns = 'http://www.w3.org/2000/svg';
@@ -1451,7 +1551,7 @@ function drawNotePattern() {
     svg.appendChild(el);
   };
 
-  // Wavy lines across the note
+  // 16 wavy horizontal lines.
   for (let row = 0; row < 16; row++) {
     let d = `M -10 ${row * 16}`;
     for (let x = -10; x <= 410; x += 10) {
@@ -1460,7 +1560,7 @@ function drawNotePattern() {
     add('path', { d, 'stroke-width': 0.5, opacity: 0.35 });
   }
 
-  // Two rosettes made of rotated ellipses
+  // Two rosettes: many rotated ellipses creating a guilloche effect.
   for (let i = 0; i < 36; i++) {
     add('ellipse', { cx: 300, cy: 100, rx: 88, ry: 30, transform: `rotate(${i * 5} 300 100)`, 'stroke-width': 0.6, opacity: 0.55 });
   }
@@ -1469,7 +1569,8 @@ function drawNotePattern() {
   }
 }
 
-// --- Magnifying lens that follows the mouse ---
+// --- Magnifying lens on the banknote -----------------------
+// Tracks the pointer and reveals hidden micro-text via a clip-path.
 function setUpLens() {
   const note = document.getElementById('note');
   const micro = note.querySelector('.note-micro');
@@ -1478,6 +1579,7 @@ function setUpLens() {
   note.addEventListener('pointermove', (e) => {
     if (e.pointerType === 'touch') return;
     const box = note.getBoundingClientRect();
+    // --x/--y feed the CSS clip-path and the lens position.
     note.style.setProperty('--x', `${e.clientX - box.left}px`);
     note.style.setProperty('--y', `${e.clientY - box.top}px`);
     note.classList.add('is-checking');
@@ -1485,12 +1587,13 @@ function setUpLens() {
   note.addEventListener('pointerleave', () => note.classList.remove('is-checking'));
 }
 
-// --- Coin that moves down "How it works" as you scroll ---
+// --- Coin travel effect on "How it works" -----------------
 const stepsList = document.getElementById('steps');
 const stepItems = stepsList.querySelectorAll('.step');
 let scrollTicking = false;
 
-// Moves the coin and lights up each step as the page scrolls
+// On each frame: computes how far through the section the user
+// has scrolled (0 → 1) and moves the coin/track and highlights steps.
 function updateScrollEffect() {
   scrollTicking = false;
   if (settings.reduceMotion) {
@@ -1509,6 +1612,7 @@ function updateScrollEffect() {
   });
 }
 
+// rAF-throttled scroll listener.
 window.addEventListener('scroll', () => {
   if (!scrollTicking) {
     scrollTicking = true;
@@ -1517,7 +1621,9 @@ window.addEventListener('scroll', () => {
 }, { passive: true });
 window.addEventListener('resize', updateScrollEffect);
 
-// --- Live rate on the banknote ---
+// --- Live rate on the banknote ----------------------------
+// Fetches today's rate for the user's home currency and shows it
+// on the illustration, so it doubles as a live information panel.
 async function updateNoteRate() {
   const from = homeSelect.value;
   const to = from === 'EUR' ? 'GBP' : 'EUR';
@@ -1533,11 +1639,14 @@ async function updateNoteRate() {
 }
 homeSelect.addEventListener('change', updateNoteRate);
 
-// --- Logo eyes follow the mouse (or your finger) ---
+// --- Logo eyes that follow the pointer --------------------
+// Computes the angle from each eye to the pointer and offsets the
+// pupil slightly in that direction.
 function setUpEyes() {
   const pupils = document.querySelectorAll('.wordmark .pupil');
   if (!pupils.length) return;
   const look = (x, y) => {
+    // Respect the "reduce motion" setting by staying still.
     if (document.documentElement.hasAttribute('data-reduce-motion')) return;
     pupils.forEach((pupil) => {
       const box = pupil.parentElement.getBoundingClientRect();
@@ -1551,7 +1660,10 @@ function setUpEyes() {
   window.addEventListener('pointerdown', (e) => look(e.clientX, e.clientY), { passive: true });
 }
 
-// --- Start everything ---
+// --- Bootstrap -------------------------------------------
+// Run all initialisation in order. restoreChat() must come after
+// settings are applied so that any saved chat re-renders with the
+// correct theme in place.
 drawNotePattern();
 setUpLens();
 setUpEyes();
