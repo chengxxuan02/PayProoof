@@ -147,11 +147,11 @@ html[data-contrast] :focus-visible { outline: 4px solid #000; box-shadow: 0 0 0 
   padding: clamp(2.5rem, 7vw, 5.5rem) clamp(1rem, 4vw, 2.5rem);
 }
 .hero h1 {
-  font-size: clamp(2.3rem, 1.4rem + 3.6vw, 4.1rem);
+  font-size: clamp(2.2rem, 1.3rem + 3.2vw, 3.6rem);
   font-weight: 800;
   letter-spacing: -0.025em;
   margin-bottom: 1.2rem;
-  max-width: 15ch;
+  max-width: 17ch;
 }
 .lede { font-size: 1.15rem; color: var(--muted); margin-bottom: 2rem; max-width: 46ch; }
 .hero-actions { display: flex; flex-wrap: wrap; gap: 0.8rem; }
